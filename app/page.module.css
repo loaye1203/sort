@@ -41,6 +41,48 @@
   font-weight: 800;
 }
 
+.brandMark img {
+  display: block;
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
+
+.mobileTopbar {
+  display: none;
+}
+
+.mobileBrand {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 10px;
+  color: #f5f7fb;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.mobileBrand span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.libraryToggle {
+  height: 38px;
+  border: 1px solid #303746;
+  border-radius: 8px;
+  padding: 0 12px;
+  background: #10141c;
+  color: #dbeafe;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.libraryToggle:hover {
+  border-color: #38bdf8;
+}
+
 .brand h1,
 .brand p,
 .stageHeader h2,
@@ -85,6 +127,51 @@
 .searchInput:focus {
   border-color: #38bdf8;
   box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.16);
+}
+
+.filterBar {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.filterBar button {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  border: 1px solid #252c38;
+  border-radius: 8px;
+  padding: 7px 4px;
+  background: #11151d;
+  color: #aeb7c7;
+}
+
+.filterBar span,
+.filterBar small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filterBar span {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.filterBar small {
+  color: #718096;
+  font-size: 10px;
+}
+
+.filterBar button:hover,
+.filterBar .filterActive {
+  border-color: #256d86;
+  background: rgba(56, 189, 248, 0.1);
+  color: #f5f7fb;
+}
+
+.filterBar .filterActive small {
+  color: #7dd3fc;
 }
 
 .categoryList {
@@ -159,6 +246,22 @@
   color: #7dd3fc;
   font-size: 11px;
   font-style: normal;
+}
+
+.emptyState {
+  display: grid;
+  gap: 6px;
+  border: 1px dashed #3a4251;
+  border-radius: 8px;
+  padding: 14px;
+  background: #11151d;
+  color: #d8dee9;
+}
+
+.emptyState span {
+  color: #8994a5;
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 .customLab {
@@ -514,7 +617,10 @@
 }
 
 .shell[data-theme="light"] .brandMark,
+.shell[data-theme="light"] .libraryToggle,
 .shell[data-theme="light"] .searchInput,
+.shell[data-theme="light"] .filterBar button,
+.shell[data-theme="light"] .emptyState,
 .shell[data-theme="light"] .customLab,
 .shell[data-theme="light"] .themeToggle,
 .shell[data-theme="light"] .visualPanel,
@@ -530,6 +636,7 @@
 }
 
 .shell[data-theme="light"] .brand h1,
+.shell[data-theme="light"] .mobileBrand,
 .shell[data-theme="light"] .stageHeader h2,
 .shell[data-theme="light"] .statsPanel h3,
 .shell[data-theme="light"] .explainPanel h3,
@@ -541,6 +648,8 @@
 .shell[data-theme="light"] .brand p,
 .shell[data-theme="light"] .searchLabel,
 .shell[data-theme="light"] .algorithmItem small,
+.shell[data-theme="light"] .filterBar button,
+.shell[data-theme="light"] .emptyState span,
 .shell[data-theme="light"] .customLab small,
 .shell[data-theme="light"] .stageHeader p,
 .shell[data-theme="light"] .codeHeader span,
@@ -564,6 +673,8 @@
 
 .shell[data-theme="light"] .algorithmItem:hover,
 .shell[data-theme="light"] .algorithmItemActive,
+.shell[data-theme="light"] .filterBar button:hover,
+.shell[data-theme="light"] .filterBar .filterActive,
 .shell[data-theme="light"] .customLabActive,
 .shell[data-theme="light"] .themeToggle:hover {
   border-color: #0787a8;
@@ -577,6 +688,7 @@
 
 .shell[data-theme="light"] .brandMark,
 .shell[data-theme="light"] .algorithmItem em,
+.shell[data-theme="light"] .filterBar .filterActive small,
 .shell[data-theme="light"] .themeToggle,
 .shell[data-theme="light"] .kicker,
 .shell[data-theme="light"] .done {
@@ -640,18 +752,56 @@
 
 @media (max-width: 980px) {
   .shell {
+    display: flex;
+    flex-direction: column;
     grid-template-columns: 1fr;
   }
 
+  .mobileTopbar {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid #252a34;
+    background: rgba(9, 11, 16, 0.92);
+    backdrop-filter: blur(14px);
+  }
+
   .sidebar {
-    position: relative;
+    position: fixed;
+    inset: 62px 0 0;
+    z-index: 4;
+    display: none;
     height: auto;
     max-height: none;
+    border-right: 0;
+    border-bottom: 1px solid #252a34;
+  }
+
+  .sidebarOpen {
+    display: flex;
+  }
+
+  .stage {
+    order: 1;
   }
 
   .controls,
   .infoGrid {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .shell[data-theme="light"] .mobileTopbar {
+    border-bottom-color: #d9e1ea;
+    background: rgba(247, 249, 252, 0.92);
+  }
+
+  .shell[data-theme="light"] .sidebar {
+    border-bottom-color: #d9e1ea;
   }
 }
 

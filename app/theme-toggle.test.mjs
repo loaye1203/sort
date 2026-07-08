@@ -20,3 +20,12 @@ test("initial visual array is deterministic for hydration", () => {
     "initial state must not call random generation during hydration",
   );
 });
+
+test("algorithm library has mobile entry, run-mode filters, and brand icon", () => {
+  assert.match(pageSource, /mobileTopbar/, "mobile layout should expose a compact top bar");
+  assert.match(pageSource, /libraryToggle/, "mobile layout should expose an algorithm library toggle");
+  assert.match(pageSource, /runModeFilters/, "algorithm library should expose run-mode filters");
+  assert.match(pageSource, /brand-icon-transparent\.png/, "page chrome should use the transparent brand icon");
+  assert.match(pageSource, /scrollIntoView/, "selecting an algorithm should return the user to the stage");
+  assert.match(cssSource, /\.sidebarOpen/, "CSS should define the opened mobile library state");
+});

@@ -16,11 +16,31 @@ import {
   getSafetyLimit,
   searchAlgorithms,
 } from "../lib/sorting/registry";
-import type { AlgorithmCategory, SafetyLimit, SortAlgorithm, SortStep } from "../lib/sorting/types";
+import type { AlgorithmCategory, AlgorithmMeta, SafetyLimit, SortAlgorithm, SortStep } from "../lib/sorting/types";
 import styles from "./page.module.css";
 
 const DEFAULT_ALGORITHM_ID = "bubble-sort";
 type ThemeMode = "dark" | "light";
+type RunModeFilter = AlgorithmMeta["runMode"] | "all";
+
+const runModeFilters: Array<{ value: RunModeFilter; label: string }> = [
+  { value: "all", label: "全部" },
+  { value: "real", label: "真实" },
+  { value: "limited", label: "限流" },
+  { value: "simulated", label: "模拟" },
+  { value: "catalog-only", label: "图鉴" },
+];
+
+function getRunModeText(runMode: AlgorithmMeta["runMode"]) {
+  const labels: Record<AlgorithmMeta["runMode"], string> = {
+    real: "真实",
+    limited: "限流",
+    simulated: "模拟",
+    "catalog-only": "图鉴",
+  };
+
+  return labels[runMode];
+}
 
 function formatBoolean(value: boolean | "depends" | "not-applicable") {
   if (value === true) {
@@ -66,6 +86,8 @@ export default function SortingZoo() {
   const [theme, setTheme] = useState<ThemeMode>("dark");
   const [showCustomLab, setShowCustomLab] = useState(false);
   const [query, setQuery] = useState("");
+  const [runModeFilter, setRunModeFilter] = useState<RunModeFilter>("all");
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<AlgorithmCategory>>(new Set());
   const [algorithm, setAlgorithm] = useState<SortAlgorithm | null>(null);
   const [speed, setSpeed] = useState(130);
@@ -80,9 +102,38 @@ export default function SortingZoo() {
   const algorithmRef = useRef<SortAlgorithm | null>(null);
   const safetyRef = useRef<SafetyLimit>(safety);
   const baseArrayRef = useRef<number[]>(baseArray);
+  const stageRef = useRef<HTMLElement | null>(null);
 
-  const filteredEntries = useMemo(() => searchAlgorithms(query), [query]);
+  const filteredEntries = useMemo(() => {
+    const entries = searchAlgorithms(query);
+
+    if (runModeFilter === "all") {
+      return entries;
+    }
+
+    return entries.filter((entry) => entry.meta.runMode === runModeFilter);
+  }, [query, runModeFilter]);
   const groupedEntries = useMemo(() => groupByCategory(filteredEntries), [filteredEntries]);
+  const runModeCounts = useMemo(
+    () =>
+      runModeFilters.reduce<Record<RunModeFilter, number>>(
+        (counts, filter) => ({
+          ...counts,
+          [filter.value]:
+            filter.value === "all"
+              ? algorithmRegistry.length
+              : algorithmRegistry.filter((entry) => entry.meta.runMode === filter.value).length,
+        }),
+        {
+          all: 0,
+          real: 0,
+          limited: 0,
+          simulated: 0,
+          "catalog-only": 0,
+        },
+      ),
+    [],
+  );
 
   useEffect(() => {
     const savedTheme = window.localStorage.getItem("sorting-zoo-theme");
@@ -323,9 +374,23 @@ export default function SortingZoo() {
     setVisualState(createInitialState(nextArray, "数组规模已更新。"));
   };
 
+  const scrollStageIntoView = useCallback(() => {
+    window.requestAnimationFrame(() => {
+      stageRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, []);
+
   const selectAlgorithm = (id: string) => {
     setShowCustomLab(false);
+    setIsLibraryOpen(false);
     setSelectedId(id);
+    scrollStageIntoView();
+  };
+
+  const openCustomLab = () => {
+    setShowCustomLab(true);
+    setIsLibraryOpen(false);
+    scrollStageIntoView();
   };
 
   const toggleCategory = (category: AlgorithmCategory) => {
@@ -344,17 +409,42 @@ export default function SortingZoo() {
 
   const maxValue = Math.max(...visualState.array, 1);
   const activeMeta = selectedEntry.meta;
-  const runModeLabel = activeMeta.runMode === "real" ? "真实运行" : activeMeta.runMode === "limited" ? "限流运行" : "模拟演示";
+  const runModeLabel = `${getRunModeText(activeMeta.runMode)}运行`;
   const statusClass = styles[visualState.status] ?? "";
   const nextTheme = theme === "dark" ? "light" : "dark";
   const themeIcon = theme === "dark" ? "☾" : "☀";
   const themeLabel = theme === "dark" ? "切换到浅色主题" : "切换到深色主题";
+  const hasFilteredEntries = filteredEntries.length > 0;
 
   return (
     <main className={styles.shell} data-theme={theme}>
-      <aside className={styles.sidebar} aria-label="算法库">
+      <div className={styles.mobileTopbar}>
+        <div className={styles.mobileBrand}>
+          <span className={styles.brandMark} aria-hidden="true">
+            <img src="/brand-icon-transparent.png" alt="" />
+          </span>
+          <span>{activeMeta.englishName}</span>
+        </div>
+        <button
+          type="button"
+          className={styles.libraryToggle}
+          aria-controls="algorithm-library"
+          aria-expanded={isLibraryOpen}
+          onClick={() => setIsLibraryOpen((current) => !current)}
+        >
+          算法库
+        </button>
+      </div>
+
+      <aside
+        id="algorithm-library"
+        className={`${styles.sidebar} ${isLibraryOpen ? styles.sidebarOpen : ""}`}
+        aria-label="算法库"
+      >
         <div className={styles.brand}>
-          <span className={styles.brandMark}>SZ</span>
+          <span className={styles.brandMark} aria-hidden="true">
+            <img src="/brand-icon-transparent.png" alt="" />
+          </span>
           <div>
             <h1>Sorting Zoo</h1>
             <p>排序算法工具台</p>
@@ -371,8 +461,23 @@ export default function SortingZoo() {
           />
         </label>
 
+        <div className={styles.filterBar} aria-label="运行模式筛选">
+          {runModeFilters.map((filter) => (
+            <button
+              key={filter.value}
+              type="button"
+              className={runModeFilter === filter.value ? styles.filterActive : ""}
+              onClick={() => setRunModeFilter(filter.value)}
+            >
+              <span>{filter.label}</span>
+              <small>{runModeCounts[filter.value]}</small>
+            </button>
+          ))}
+        </div>
+
         <nav className={styles.categoryList}>
-          {groupedEntries.map(({ category, entries }) => {
+          {hasFilteredEntries ? (
+            groupedEntries.map(({ category, entries }) => {
             if (entries.length === 0) {
               return null;
             }
@@ -381,7 +486,12 @@ export default function SortingZoo() {
 
             return (
               <section key={category} className={styles.categoryBlock}>
-                <button className={styles.categoryHeader} type="button" onClick={() => toggleCategory(category)}>
+                <button
+                  className={styles.categoryHeader}
+                  type="button"
+                  aria-expanded={!collapsed}
+                  onClick={() => toggleCategory(category)}
+                >
                   <span>{category}</span>
                   <span>{collapsed ? "+" : "-"}</span>
                 </button>
@@ -392,36 +502,44 @@ export default function SortingZoo() {
                       <button
                         key={meta.id}
                         type="button"
+                        data-algorithm-id={meta.id}
                         className={`${styles.algorithmItem} ${
                           !showCustomLab && meta.id === selectedId ? styles.algorithmItemActive : ""
                         }`}
+                        aria-current={!showCustomLab && meta.id === selectedId ? "true" : undefined}
                         onClick={() => selectAlgorithm(meta.id)}
                       >
                         <span>
                           <strong>{meta.englishName}</strong>
                           <small>{meta.name}</small>
                         </span>
-                        <em>{meta.runMode === "real" ? "real" : meta.runMode}</em>
+                        <em>{getRunModeText(meta.runMode)}</em>
                       </button>
                     ))}
                   </div>
                 )}
               </section>
             );
-          })}
+          })
+          ) : (
+            <div className={styles.emptyState}>
+              <strong>没有找到算法</strong>
+              <span>换个关键词，或切回“全部”再试。</span>
+            </div>
+          )}
         </nav>
 
         <button
           className={`${styles.customLab} ${showCustomLab ? styles.customLabActive : ""}`}
           type="button"
-          onClick={() => setShowCustomLab(true)}
+          onClick={openCustomLab}
         >
           <span>自定义排序实验室</span>
           <small>占位入口，不执行用户代码</small>
         </button>
       </aside>
 
-      <section className={styles.stage} aria-label="算法演示台">
+      <section ref={stageRef} className={styles.stage} aria-label="算法演示台">
         {showCustomLab ? (
           <div className={styles.placeholderPanel}>
             <p className={styles.kicker}>预留功能</p>
