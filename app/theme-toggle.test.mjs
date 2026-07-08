@@ -11,3 +11,12 @@ test("sorting page exposes a dark and light theme toggle", () => {
   assert.match(pageSource, /setTheme/, "page should update theme state");
   assert.match(cssSource, /\.shell\[data-theme="light"\]/, "CSS should define a light theme");
 });
+
+test("initial visual array is deterministic for hydration", () => {
+  assert.match(pageSource, /createHydrationSafeArray/, "page should use a deterministic first render array");
+  assert.doesNotMatch(
+    pageSource,
+    /useState<number\[\]>\(\(\)\s*=>\s*createRandomArray/,
+    "initial state must not call random generation during hydration",
+  );
+});

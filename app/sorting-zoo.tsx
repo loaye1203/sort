@@ -57,6 +57,10 @@ function groupByCategory(entries: typeof algorithmRegistry) {
   }));
 }
 
+function createHydrationSafeArray(size: number) {
+  return Array.from({ length: size }, (_, index) => 8 + ((index * 37 + 23) % 88));
+}
+
 export default function SortingZoo() {
   const [selectedId, setSelectedId] = useState(DEFAULT_ALGORITHM_ID);
   const [theme, setTheme] = useState<ThemeMode>("dark");
@@ -69,7 +73,7 @@ export default function SortingZoo() {
   const safety = useMemo(() => getSafetyLimit(selectedEntry.meta), [selectedEntry.meta]);
   const [arraySize, setArraySize] = useState(selectedEntry.meta.recommendedSize.default);
   const [baseArray, setBaseArray] = useState<number[]>(() =>
-    createRandomArray(selectedEntry.meta.recommendedSize.default),
+    createHydrationSafeArray(selectedEntry.meta.recommendedSize.default),
   );
   const [visualState, setVisualState] = useState<VisualizationState>(() => createInitialState(baseArray));
   const generatorRef = useRef<Generator<SortStep> | null>(null);
