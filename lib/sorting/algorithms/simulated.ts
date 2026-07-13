@@ -119,19 +119,22 @@ function* burstsort(input: number[]): Generator<SortStep> {
 }
 
 function* dropMergeSort(input: number[]): Generator<SortStep> {
-  const output: number[] = [];
+  const array = clone(input);
+  let cursor = 1;
   yield { type: "message", text: "Drop-Merge 会丢弃破坏顺序的元素，不是真正保全数据的排序。" };
 
-  for (let index = 0; index < input.length; index += 1) {
-    if (output.length === 0 || input[index] >= output[output.length - 1]) {
-      output.push(input[index]);
-      yield { type: "write", index: output.length - 1, value: input[index], array: clone(output) };
+  while (cursor < array.length) {
+    yield { type: "compare", indices: [cursor - 1, cursor] };
+
+    if (array[cursor] < array[cursor - 1]) {
+      array.splice(cursor, 1);
+      yield { type: "delete", index: cursor, array: clone(array) };
     } else {
-      yield { type: "delete", index, array: clone(output) };
+      cursor += 1;
     }
   }
 
-  yield done(output);
+  yield done(array);
 }
 
 function* writeSortedSimulation(input: number[], message: string): Generator<SortStep> {
@@ -389,7 +392,11 @@ function* sleepSort(input: number[], options: SortOptions): Generator<SortStep> 
   for (let index = 0; index < sorted.length; index += 1) {
     const value = sorted[index];
     output.push(value);
-    yield { type: "message", text: `数值 ${value} 醒来，进入输出队列。` };
+    yield {
+      type: "message",
+      text: `数值 ${value} 醒来，进入输出队列。`,
+      animation: { kind: "timer", durationWeight: Math.min(1.5, 0.7 + value / 120) },
+    };
     yield { type: "write", index, value, array: clone(output) };
   }
 

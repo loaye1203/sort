@@ -99,7 +99,7 @@ export default function SortingZoo() {
               </button>
             </header>
 
-            <SortingVisualizer state={runner.visualState} speed={runner.speed} />
+            <SortingVisualizer state={runner.visualState} speed={runner.speed} theme={themeMode.theme} />
             <SortingControls
               algorithmReady={runner.algorithm !== null}
               arraySize={runner.arraySize}

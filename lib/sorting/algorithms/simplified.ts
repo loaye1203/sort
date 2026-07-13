@@ -191,33 +191,32 @@ function* weakHeapSort(input: number[]): Generator<SortStep> {
 }
 
 function* cartesianTreeSort(input: number[]): Generator<SortStep> {
-  const array = clone(input);
+  const remaining = clone(input);
   const output: number[] = [];
-  const active = array.map(() => true);
   yield { type: "message", text: "笛卡尔树排序可用树维护最小值；首版用反复抽取最小值演示。" };
 
-  while (output.length < array.length) {
-    let minimum = -1;
+  while (remaining.length > 0) {
+    let minimum = 0;
+    const offset = output.length;
 
-    for (let index = 0; index < array.length; index += 1) {
-      if (!active[index]) {
-        continue;
-      }
+    for (let index = 1; index < remaining.length; index += 1) {
+      yield { type: "compare", indices: [offset + minimum, offset + index] };
 
-      if (minimum === -1) {
+      if (remaining[index] < remaining[minimum]) {
         minimum = index;
-      } else {
-        yield { type: "compare", indices: [minimum, index] };
-
-        if (array[index] < array[minimum]) {
-          minimum = index;
-        }
       }
     }
 
-    active[minimum] = false;
-    output.push(array[minimum]);
-    yield { type: "write", index: output.length - 1, value: array[minimum], array: clone(output) };
+    const sourceIndex = offset + minimum;
+    const [value] = remaining.splice(minimum, 1);
+    output.push(value);
+    yield {
+      type: "write",
+      index: offset,
+      value,
+      array: [...output, ...remaining],
+      animation: { kind: "move", from: sourceIndex, to: offset, lane: "upper" },
+    };
   }
 
   yield done(output);

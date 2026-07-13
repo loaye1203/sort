@@ -8,7 +8,11 @@ export type AlgorithmCategory =
 
 export type AlgorithmImplementationLevel = "full" | "simplified" | "simulated" | "catalog-only";
 
-export type SortStep =
+export type SortAnimationHint =
+  | { kind: "move" | "range-shift"; from: number; to: number; lane?: "upper" | "lower" }
+  | { kind: "timer"; index?: number; durationWeight?: number };
+
+export type SortStep = (
   | { type: "compare"; indices: number[] }
   | { type: "swap"; indices: [number, number]; array: number[] }
   | { type: "write"; index: number; value: number; array: number[] }
@@ -21,7 +25,8 @@ export type SortStep =
   | { type: "shuffle"; array: number[] }
   | { type: "message"; text: string }
   | { type: "done"; array: number[] }
-  | { type: "aborted"; reason: string };
+  | { type: "aborted"; reason: string }
+) & { animation?: SortAnimationHint };
 
 export interface AlgorithmMeta {
   id: string;

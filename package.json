@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "next": "^15.2.0",
+    "pixi.js": "8.19.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

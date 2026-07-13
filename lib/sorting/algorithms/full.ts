@@ -98,12 +98,24 @@ function* insertionSort(input: number[]): Generator<SortStep> {
       }
 
       array[cursor + 1] = array[cursor];
-      yield { type: "write", index: cursor + 1, value: array[cursor + 1], array: clone(array) };
+      yield {
+        type: "write",
+        index: cursor + 1,
+        value: array[cursor + 1],
+        array: clone(array),
+        animation: { kind: "range-shift", from: cursor, to: cursor + 1, lane: "lower" },
+      };
       cursor -= 1;
     }
 
     array[cursor + 1] = value;
-    yield { type: "write", index: cursor + 1, value, array: clone(array) };
+    yield {
+      type: "write",
+      index: cursor + 1,
+      value,
+      array: clone(array),
+      animation: { kind: "move", from: index, to: cursor + 1, lane: "upper" },
+    };
   }
 
   yield done(array);
@@ -645,11 +657,23 @@ function* binaryInsertionSort(input: number[]): Generator<SortStep> {
 
     for (let cursor = index; cursor > left; cursor -= 1) {
       array[cursor] = array[cursor - 1];
-      yield { type: "write", index: cursor, value: array[cursor], array: clone(array) };
+      yield {
+        type: "write",
+        index: cursor,
+        value: array[cursor],
+        array: clone(array),
+        animation: { kind: "range-shift", from: cursor - 1, to: cursor, lane: "lower" },
+      };
     }
 
     array[left] = value;
-    yield { type: "write", index: left, value, array: clone(array) };
+    yield {
+      type: "write",
+      index: left,
+      value,
+      array: clone(array),
+      animation: { kind: "move", from: index, to: left, lane: "upper" },
+    };
   }
 
   yield done(array);
@@ -1095,34 +1119,33 @@ function* treeSort(input: number[]): Generator<SortStep> {
 }
 
 function* tournamentSort(input: number[]): Generator<SortStep> {
-  const array = clone(input);
-  const active = array.map(() => true);
+  const remaining = clone(input);
   const output: number[] = [];
 
-  while (output.length < array.length) {
-    let winner = -1;
+  while (remaining.length > 0) {
+    let winner = 0;
+    const offset = output.length;
+    yield { type: "mark", indices: [offset], role: "candidate" };
 
-    for (let index = 0; index < array.length; index += 1) {
-      if (!active[index]) {
-        continue;
-      }
+    for (let index = 1; index < remaining.length; index += 1) {
+      yield { type: "compare", indices: [offset + winner, offset + index] };
 
-      if (winner === -1) {
+      if (remaining[index] < remaining[winner]) {
         winner = index;
-        yield { type: "mark", indices: [winner], role: "candidate" };
-      } else {
-        yield { type: "compare", indices: [winner, index] };
-
-        if (array[index] < array[winner]) {
-          winner = index;
-          yield { type: "mark", indices: [winner], role: "candidate" };
-        }
+        yield { type: "mark", indices: [offset + winner], role: "candidate" };
       }
     }
 
-    active[winner] = false;
-    output.push(array[winner]);
-    yield { type: "write", index: output.length - 1, value: array[winner], array: clone(output) };
+    const sourceIndex = offset + winner;
+    const [value] = remaining.splice(winner, 1);
+    output.push(value);
+    yield {
+      type: "write",
+      index: offset,
+      value,
+      array: [...output, ...remaining],
+      animation: { kind: "move", from: sourceIndex, to: offset, lane: "upper" },
+    };
   }
 
   yield done(output);
@@ -1666,18 +1689,26 @@ function* quickselectSort(input: number[]): Generator<SortStep> {
 
   while (remaining.length > 0) {
     let minimum = 0;
+    const offset = output.length;
 
     for (let index = 1; index < remaining.length; index += 1) {
-      yield { type: "compare", indices: [minimum, index] };
+      yield { type: "compare", indices: [offset + minimum, offset + index] };
 
       if (remaining[index] < remaining[minimum]) {
         minimum = index;
       }
     }
 
+    const sourceIndex = offset + minimum;
     const [value] = remaining.splice(minimum, 1);
     output.push(value);
-    yield { type: "write", index: output.length - 1, value, array: clone(output) };
+    yield {
+      type: "write",
+      index: offset,
+      value,
+      array: [...output, ...remaining],
+      animation: { kind: "move", from: sourceIndex, to: offset, lane: "upper" },
+    };
   }
 
   yield done(output);

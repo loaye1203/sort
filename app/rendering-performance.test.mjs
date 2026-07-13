@@ -8,6 +8,8 @@ const ts = require("typescript");
 const pagePath = new URL("./sorting-zoo.tsx", import.meta.url);
 const pageSource = readFileSync(pagePath, "utf8");
 const visualizerSource = readFileSync(new URL("./components/sorting-visualizer.tsx", import.meta.url), "utf8");
+const pixiStageSource = readFileSync(new URL("./components/pixi-sorting-stage.tsx", import.meta.url), "utf8");
+const pixiRendererSource = readFileSync(new URL("../lib/sorting/pixi-sorting-renderer.ts", import.meta.url), "utf8");
 const sidebarSource = readFileSync(new URL("./components/algorithm-sidebar.tsx", import.meta.url), "utf8");
 const infoSource = readFileSync(new URL("./components/algorithm-info.tsx", import.meta.url), "utf8");
 const codePanelSource = readFileSync(new URL("./components/algorithm-code-panel.tsx", import.meta.url), "utf8");
@@ -23,6 +25,7 @@ function loadVisualizerModule() {
   const moduleRecord = { exports: {} };
   const dependencies = {
     "../../lib/sorting/engine": {},
+    "./pixi-sorting-stage": { PixiSortingStage: () => null },
     "../page.module.css": { default: {} },
   };
   const localRequire = (id) => (Object.hasOwn(dependencies, id) ? dependencies[id] : require(id));
@@ -55,4 +58,19 @@ test("low-frequency regions have memoized module-level render boundaries", () =>
   assert.match(infoSource, /export const AlgorithmInfo = memo\(/);
   assert.match(codePanelSource, /export const AlgorithmCodePanel = memo\(/);
   assert.doesNotMatch(pageSource, /const AlgorithmSidebar = memo\(/);
+});
+
+test("Pixi renderer follows the local v8 lifecycle and keeps a DOM fallback", () => {
+  assert.match(pixiRendererSource, /new Application\(\)/);
+  assert.match(pixiRendererSource, /await this\.app\.init\(/);
+  assert.match(pixiRendererSource, /this\.app\.canvas/);
+  assert.match(pixiRendererSource, /ticker\.deltaMS/);
+  assert.match(pixiRendererSource, /releaseGlobalResources:\s*true/);
+  assert.match(pixiRendererSource, /new NineSliceSprite\(/);
+  assert.match(pixiRendererSource, /\.roundRect\(0, 0, BAR_TEXTURE_SIZE, BAR_TEXTURE_SIZE, BAR_CORNER_RADIUS\)/);
+  assert.match(pixiRendererSource, /graphic\.setSize\(metrics\.barWidth, height\)/);
+  assert.doesNotMatch(pixiRendererSource, /graphic\.scale|\.node\.scale/);
+  assert.doesNotMatch(pixiRendererSource, /beginFill|drawRect|lineStyle|app\.view/);
+  assert.match(pixiStageSource, /import\("\.\.\/\.\.\/lib\/sorting\/pixi-sorting-renderer"\)/);
+  assert.match(visualizerSource, /data-dom-visualizer-fallback/);
 });

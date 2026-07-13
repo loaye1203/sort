@@ -5,7 +5,9 @@ export type HighlightRole = "active" | "sorted" | "pivot" | "candidate" | "delet
 export interface VisualizationState {
   array: number[];
   highlights: Map<number, HighlightRole>;
+  lastStep: SortStep | null;
   message: string;
+  stepSequence: number;
   status: "idle" | "running" | "paused" | "done" | "aborted";
   stats: VisualStats;
 }
@@ -31,7 +33,9 @@ export function createInitialState(array: number[], message = "准备演示。")
   return {
     array,
     highlights: new Map(),
+    lastStep: null,
     message,
+    stepSequence: 0,
     status: "idle",
     stats: { ...INITIAL_STATS },
   };
@@ -142,7 +146,9 @@ export function applySortStep(state: VisualizationState, step: SortStep): Visual
     ...state,
     array: nextArray,
     highlights,
+    lastStep: step,
     message,
+    stepSequence: state.stepSequence + 1,
     status,
     stats: nextStats,
   };
