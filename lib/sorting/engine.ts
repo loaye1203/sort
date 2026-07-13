@@ -37,10 +37,47 @@ export function createInitialState(array: number[], message = "准备演示。")
   };
 }
 
+export function createLatestRequestGuard() {
+  let latestToken = 0;
+
+  return {
+    begin() {
+      latestToken += 1;
+      return latestToken;
+    },
+    isCurrent(token: number) {
+      return token === latestToken;
+    },
+  };
+}
+
+export function getActiveElapsedMs(stats: VisualStats, now = performance.now()) {
+  return stats.elapsedMs + (stats.startedAt === null ? 0 : Math.max(0, now - stats.startedAt));
+}
+
+export function resumeTiming(stats: VisualStats, now = performance.now()): VisualStats {
+  if (stats.startedAt !== null) {
+    return stats;
+  }
+
+  return {
+    ...stats,
+    startedAt: now,
+  };
+}
+
+export function pauseTiming(stats: VisualStats, now = performance.now()): VisualStats {
+  return {
+    ...stats,
+    startedAt: null,
+    elapsedMs: getActiveElapsedMs(stats, now),
+  };
+}
+
 export function applySortStep(state: VisualizationState, step: SortStep): VisualizationState {
   const nextStats: VisualStats = {
     ...state.stats,
-    steps: state.stats.steps + 1,
+    steps: state.stats.steps + (step.type === "aborted" ? 0 : 1),
   };
   const highlights = new Map<number, HighlightRole>();
   let nextArray = state.array;
@@ -111,12 +148,12 @@ export function applySortStep(state: VisualizationState, step: SortStep): Visual
   };
 }
 
-export function shouldAbort(stats: VisualStats, safety: SafetyLimit) {
+export function shouldAbort(stats: VisualStats, safety: SafetyLimit, now = performance.now()) {
   if (stats.steps >= safety.maxSteps) {
     return `已达到 ${safety.maxSteps.toLocaleString("zh-CN")} 步上限，演示已中断。`;
   }
 
-  if (stats.startedAt !== null && performance.now() - stats.startedAt >= safety.maxRuntimeMs) {
+  if (getActiveElapsedMs(stats, now) >= safety.maxRuntimeMs) {
     return `已达到 ${safety.maxRuntimeMs}ms 运行上限，演示已中断。`;
   }
 

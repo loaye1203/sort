@@ -1,5 +1,4 @@
-import { algorithmRegistry } from "./registry";
-import type { SortAlgorithm, SortOptions, SortStep } from "./types";
+import type { AlgorithmImplementation, SortOptions, SortStep } from "../types";
 
 function clone(input: number[]) {
   return [...input];
@@ -28,16 +27,6 @@ function shuffle(values: number[]) {
 
 function done(array: number[]): SortStep {
   return { type: "done", array: clone(array) };
-}
-
-function metaFor(id: string) {
-  const entry = algorithmRegistry.find((item) => item.meta.id === id);
-
-  if (!entry) {
-    throw new Error(`Unknown algorithm meta: ${id}`);
-  }
-
-  return entry.meta;
 }
 
 function* bubbleSort(input: number[]): Generator<SortStep> {
@@ -1060,40 +1049,6 @@ function* pigeonholeSort(input: number[]): Generator<SortStep> {
   yield done(array);
 }
 
-function* americanFlagSort(input: number[]): Generator<SortStep> {
-  const array = clone(input);
-  const maximum = Math.max(...array, 0);
-  let place = 1;
-
-  while (Math.floor(maximum / place) >= 10) {
-    place *= 10;
-  }
-
-  yield { type: "message", text: "美式旗帜排序首版以桶边界写回模拟原地循环置换。" };
-
-  for (let currentPlace = place; currentPlace >= 1; currentPlace = Math.floor(currentPlace / 10)) {
-    const buckets: number[][] = Array.from({ length: 10 }, () => []);
-
-    for (let index = 0; index < array.length; index += 1) {
-      const digit = Math.floor(array[index] / currentPlace) % 10;
-      buckets[digit].push(array[index]);
-      yield { type: "mark", indices: [index], role: "candidate" };
-    }
-
-    let writeIndex = 0;
-
-    for (const bucket of buckets) {
-      for (const value of bucket) {
-        array[writeIndex] = value;
-        yield { type: "write", index: writeIndex, value, array: clone(array) };
-        writeIndex += 1;
-      }
-    }
-  }
-
-  yield done(array);
-}
-
 function* treeSort(input: number[]): Generator<SortStep> {
   type TreeNode = { value: number; left: TreeNode | null; right: TreeNode | null };
   const array = clone(input);
@@ -1219,57 +1174,6 @@ function* strandSort(input: number[]): Generator<SortStep> {
   yield done(output);
 }
 
-function* librarySort(input: number[]): Generator<SortStep> {
-  const array = clone(input);
-  yield { type: "message", text: "图书馆排序首版用带空位思想的插入演示，真实实现会维护稀疏数组。" };
-
-  for (let index = 1; index < array.length; index += 1) {
-    const value = array[index];
-    let cursor = index - 1;
-
-    while (cursor >= 0) {
-      yield { type: "compare", indices: [cursor, cursor + 1] };
-
-      if (array[cursor] <= value) {
-        break;
-      }
-
-      array[cursor + 1] = array[cursor];
-      yield { type: "write", index: cursor + 1, value: array[cursor + 1], array: clone(array) };
-      cursor -= 1;
-    }
-
-    array[cursor + 1] = value;
-    yield { type: "write", index: cursor + 1, value, array: clone(array) };
-  }
-
-  yield done(array);
-}
-
-function* beadSort(input: number[]): Generator<SortStep> {
-  const array = clone(input);
-  const sorted = clone(input).sort((left, right) => left - right);
-  yield { type: "message", text: "珠排序依赖正整数珠子下落；这里用重力层级效果模拟，不构造大矩阵。" };
-
-  for (let index = 0; index < sorted.length; index += 1) {
-    array[index] = sorted[index];
-    yield { type: "write", index, value: sorted[index], array: clone(array) };
-  }
-
-  yield done(array);
-}
-
-function* spaghettiSort(input: number[]): Generator<SortStep> {
-  const output = clone(input).sort((left, right) => left - right);
-  yield { type: "message", text: "意大利面排序是物理隐喻：先拿最高的面条。首版只模拟抽取顺序。" };
-
-  for (let index = output.length - 1; index >= 0; index -= 1) {
-    yield { type: "mark", indices: [index], role: "candidate" };
-  }
-
-  yield done(output);
-}
-
 function* stoogeSort(input: number[], options: SortOptions): Generator<SortStep> {
   const array = clone(input).slice(0, options.safety.maxArraySize);
   yield { type: "message", text: "Stooge 排序增长很凶，已按危险模式限制规模。" };
@@ -1298,32 +1202,6 @@ function* stoogeSort(input: number[], options: SortOptions): Generator<SortStep>
   yield done(array);
 }
 
-function* slowSort(input: number[], options: SortOptions): Generator<SortStep> {
-  const array = clone(input).slice(0, options.safety.maxArraySize);
-  yield { type: "message", text: "Slow Sort 是反效率教学样本，只在极小数组上演示递归。" };
-
-  function* sort(left: number, right: number): Generator<SortStep> {
-    if (left >= right) {
-      return;
-    }
-
-    const middle = Math.floor((left + right) / 2);
-    yield* sort(left, middle);
-    yield* sort(middle + 1, right);
-    yield { type: "compare", indices: [middle, right] };
-
-    if (array[middle] > array[right]) {
-      [array[middle], array[right]] = [array[right], array[middle]];
-      yield { type: "swap", indices: [middle, right], array: clone(array) };
-    }
-
-    yield* sort(left, right - 1);
-  }
-
-  yield* sort(0, array.length - 1);
-  yield done(array);
-}
-
 function* bozoSort(input: number[], options: SortOptions): Generator<SortStep> {
   const array = clone(input).slice(0, options.safety.maxArraySize);
   let attempts = 0;
@@ -1340,19 +1218,6 @@ function* bozoSort(input: number[], options: SortOptions): Generator<SortStep> {
       yield { type: "aborted", reason: "随机交换没有在限制内完成，已停止演示。" };
       return;
     }
-  }
-
-  yield done(array);
-}
-
-function* miracleSort(input: number[]): Generator<SortStep> {
-  const array = clone(input);
-  const sorted = clone(input).sort((left, right) => left - right);
-  yield { type: "message", text: "奇迹排序真实逻辑是等待数组自己变有序；这里直接标记为模拟。" };
-
-  for (let index = 0; index < sorted.length; index += 1) {
-    array[index] = sorted[index];
-    yield { type: "write", index, value: sorted[index], array: clone(array) };
   }
 
   yield done(array);
@@ -1403,51 +1268,6 @@ function* inPlaceMergeSort(input: number[], options: SortOptions): Generator<Sor
   yield done(array);
 }
 
-function* blockMergeSort(input: number[]): Generator<SortStep> {
-  const array = clone(input);
-  const blockSize = Math.max(4, Math.floor(Math.sqrt(array.length)));
-  yield { type: "message", text: `块归并排序：先整理长度约 ${blockSize} 的小块。` };
-
-  for (let start = 0; start < array.length; start += blockSize) {
-    const end = Math.min(start + blockSize, array.length);
-
-    for (let index = start + 1; index < end; index += 1) {
-      const value = array[index];
-      let cursor = index - 1;
-
-      while (cursor >= start) {
-        yield { type: "compare", indices: [cursor, cursor + 1] };
-
-        if (array[cursor] <= value) {
-          break;
-        }
-
-        array[cursor + 1] = array[cursor];
-        yield { type: "write", index: cursor + 1, value: array[cursor + 1], array: clone(array) };
-        cursor -= 1;
-      }
-
-      array[cursor + 1] = value;
-      yield { type: "write", index: cursor + 1, value, array: clone(array) };
-    }
-  }
-
-  for (let width = blockSize; width < array.length; width *= 2) {
-    for (let left = 0; left < array.length - width; left += width * 2) {
-      const middle = left + width;
-      const right = Math.min(left + width * 2, array.length);
-      const merged = [...array.slice(left, middle), ...array.slice(middle, right)].sort((first, second) => first - second);
-
-      for (let index = 0; index < merged.length; index += 1) {
-        array[left + index] = merged[index];
-        yield { type: "write", index: left + index, value: merged[index], array: clone(array) };
-      }
-    }
-  }
-
-  yield done(array);
-}
-
 function* weaveMergeSort(input: number[]): Generator<SortStep> {
   const array = clone(input);
 
@@ -1473,51 +1293,6 @@ function* weaveMergeSort(input: number[]): Generator<SortStep> {
   yield { type: "message", text: "交织归并用奇偶位置拆分，再把排序后的结果织回去。" };
   yield* sort(array.map((_, index) => index));
   yield done(array);
-}
-
-function* smoothSort(input: number[]): Generator<SortStep> {
-  const array = clone(input);
-  yield { type: "message", text: "平滑排序的 Leonardo 堆结构较复杂，首版用堆式过程演示核心选择。" };
-  yield* heapSort(array);
-}
-
-function* weakHeapSort(input: number[]): Generator<SortStep> {
-  const array = clone(input);
-  yield { type: "message", text: "弱堆排序首版模拟弱堆的比较交换过程，保持可视化稳定。" };
-  yield* heapSort(array);
-}
-
-function* cartesianTreeSort(input: number[]): Generator<SortStep> {
-  const array = clone(input);
-  const output: number[] = [];
-  const active = array.map(() => true);
-  yield { type: "message", text: "笛卡尔树排序可用树维护最小值；首版用反复抽取最小值演示。" };
-
-  while (output.length < array.length) {
-    let minimum = -1;
-
-    for (let index = 0; index < array.length; index += 1) {
-      if (!active[index]) {
-        continue;
-      }
-
-      if (minimum === -1) {
-        minimum = index;
-      } else {
-        yield { type: "compare", indices: [minimum, index] };
-
-        if (array[index] < array[minimum]) {
-          minimum = index;
-        }
-      }
-    }
-
-    active[minimum] = false;
-    output.push(array[minimum]);
-    yield { type: "write", index: output.length - 1, value: array[minimum], array: clone(output) };
-  }
-
-  yield done(output);
 }
 
 function* flashSort(input: number[]): Generator<SortStep> {
@@ -1654,19 +1429,6 @@ function* postmanSort(input: number[]): Generator<SortStep> {
   yield done(array);
 }
 
-function* burstsort(input: number[]): Generator<SortStep> {
-  const array = clone(input);
-  const sorted = clone(input).sort((left, right) => String(left).localeCompare(String(right), undefined, { numeric: true }));
-  yield { type: "message", text: "Burstsort 原本服务字符串排序；数字数组中只模拟前缀桶思想。" };
-
-  for (let index = 0; index < sorted.length; index += 1) {
-    array[index] = sorted[index];
-    yield { type: "write", index, value: sorted[index], array: clone(array) };
-  }
-
-  yield done(array);
-}
-
 function* sampleSort(input: number[]): Generator<SortStep> {
   const array = clone(input);
   const sortedSample = clone(input).sort((left, right) => left - right);
@@ -1788,35 +1550,6 @@ function* oddEvenMergeSort(input: number[], options: SortOptions): Generator<Sor
   yield done(array);
 }
 
-function* pairwiseSortingNetwork(input: number[], options: SortOptions): Generator<SortStep> {
-  const array = clone(input).slice(0, options.safety.maxArraySize);
-  yield { type: "message", text: "Pairwise Sorting Network 首版用固定比较层演示，适合小数组。" };
-
-  for (let width = 1; width < array.length; width *= 2) {
-    for (let start = 0; start < array.length; start += width * 2) {
-      for (let offset = 0; offset < width && start + offset + width < array.length; offset += 1) {
-        const left = start + offset;
-        const right = start + offset + width;
-        yield { type: "compare", indices: [left, right] };
-
-        if (array[left] > array[right]) {
-          [array[left], array[right]] = [array[right], array[left]];
-          yield { type: "swap", indices: [left, right], array: clone(array) };
-        }
-      }
-    }
-  }
-
-  const sorted = clone(array).sort((left, right) => left - right);
-
-  for (let index = 0; index < sorted.length; index += 1) {
-    array[index] = sorted[index];
-    yield { type: "write", index, value: sorted[index], array: clone(array) };
-  }
-
-  yield done(array);
-}
-
 function* rankSort(input: number[]): Generator<SortStep> {
   const array = clone(input);
   const output = new Array(array.length);
@@ -1901,6 +1634,16 @@ function* circleSort(input: number[], options: SortOptions): Generator<SortStep>
       high -= 1;
     }
 
+    if (low === high && high + 1 <= right) {
+      yield { type: "compare", indices: [low, high + 1] };
+
+      if (array[low] > array[high + 1]) {
+        [array[low], array[high + 1]] = [array[high + 1], array[low]];
+        swapped = true;
+        yield { type: "swap", indices: [low, high + 1], array: clone(array) };
+      }
+    }
+
     const middle = Math.floor((right - left) / 2);
     const leftChanged = yield* pass(left, left + middle);
     const rightChanged = yield* pass(left + middle + 1, right);
@@ -1911,72 +1654,6 @@ function* circleSort(input: number[], options: SortOptions): Generator<SortStep>
 
   while (changed) {
     changed = yield* pass(0, array.length - 1);
-  }
-
-  yield done(array);
-}
-
-function* cycleLeaderSort(input: number[]): Generator<SortStep> {
-  const array = clone(input);
-  const sorted = clone(input).sort((left, right) => left - right);
-  const used = new Array(array.length).fill(false);
-  yield { type: "message", text: "Cycle Leader Sort 根据目标排列逐环搬移，适合解释置换循环。" };
-
-  for (let start = 0; start < array.length; start += 1) {
-    if (used[start] || array[start] === sorted[start]) {
-      used[start] = true;
-      continue;
-    }
-
-    let cursor = start;
-    const value = array[start];
-
-    while (!used[cursor]) {
-      used[cursor] = true;
-      const target = sorted.findIndex((item, index) => !used[index] && item === array[cursor]);
-      const next = target === -1 ? cursor : target;
-      array[cursor] = sorted[cursor];
-      yield { type: "write", index: cursor, value: array[cursor], array: clone(array) };
-      cursor = next;
-    }
-
-    if (array[start] !== value) {
-      yield { type: "mark", indices: [start], role: "sorted" };
-    }
-  }
-
-  for (let index = 0; index < sorted.length; index += 1) {
-    array[index] = sorted[index];
-    yield { type: "write", index, value: sorted[index], array: clone(array) };
-  }
-
-  yield done(array);
-}
-
-function* dropMergeSort(input: number[]): Generator<SortStep> {
-  const output: number[] = [];
-  yield { type: "message", text: "Drop-Merge 会丢弃破坏顺序的元素，不是真正保全数据的排序。" };
-
-  for (let index = 0; index < input.length; index += 1) {
-    if (output.length === 0 || input[index] >= output[output.length - 1]) {
-      output.push(input[index]);
-      yield { type: "write", index: output.length - 1, value: input[index], array: clone(output) };
-    } else {
-      yield { type: "delete", index, array: clone(output) };
-    }
-  }
-
-  yield done(output);
-}
-
-function* writeSortedSimulation(input: number[], message: string): Generator<SortStep> {
-  const array = clone(input);
-  const sorted = clone(input).sort((left, right) => left - right);
-  yield { type: "message", text: message };
-
-  for (let index = 0; index < sorted.length; index += 1) {
-    array[index] = sorted[index];
-    yield { type: "write", index, value: sorted[index], array: clone(array) };
   }
 
   yield done(array);
@@ -2096,98 +1773,6 @@ function* ternaryHeapSort(input: number[]): Generator<SortStep> {
   yield done(array);
 }
 
-function* binomialHeapSort(input: number[]): Generator<SortStep> {
-  yield* writeSortedSimulation(input, "二项堆排序真实实现需要合并二项树森林；首版模拟插入堆并反复取最小值。");
-}
-
-function* pairingHeapSort(input: number[]): Generator<SortStep> {
-  yield* writeSortedSimulation(input, "配对堆排序依赖多路树合并；首版用模拟写回展示优先队列排序结果。");
-}
-
-function* cubeSort(input: number[]): Generator<SortStep> {
-  yield* writeSortedSimulation(input, "Cubesort 是工程型自适应稳定排序；首版作为图鉴模拟，不复刻完整实现。");
-}
-
-function* quadSort(input: number[]): Generator<SortStep> {
-  yield* writeSortedSimulation(input, "Quadsort 依赖多阶段块归并和分支优化；首版用块归并思想模拟。");
-}
-
-function* grailSort(input: number[]): Generator<SortStep> {
-  yield* writeSortedSimulation(input, "GrailSort 是稳定原地块归并，工程细节复杂；首版只做受限图鉴演示。");
-}
-
-function* wikiSort(input: number[]): Generator<SortStep> {
-  yield* writeSortedSimulation(input, "WikiSort 属于稳定块归并家族；首版不复制外部实现，只演示最终合并效果。");
-}
-
-function* fluxSort(input: number[]): Generator<SortStep> {
-  yield* writeSortedSimulation(input, "Fluxsort 是工程型混合排序；首版标记为图鉴模拟，展示混合排序目标结果。");
-}
-
-function* pdqSort(input: number[]): Generator<SortStep> {
-  yield* writeSortedSimulation(input, "PDQSort 会识别坏模式并切换策略；首版用模拟写回表达模式破坏快排。");
-}
-
-function* powerSort(input: number[]): Generator<SortStep> {
-  yield* writeSortedSimulation(input, "PowerSort 是 Timsort 相关的归并栈策略；首版模拟 run 合并结果。");
-}
-
-function* shiversSort(input: number[]): Generator<SortStep> {
-  yield* writeSortedSimulation(input, "Shivers Sort 是自适应归并栈策略；首版作为归并策略图鉴演示。");
-}
-
-function* mergeInsertionSort(input: number[], options: SortOptions): Generator<SortStep> {
-  const array = clone(input).slice(0, options.safety.maxArraySize);
-  yield { type: "message", text: "归并插入排序优化比较次数；首版用配对、主链、插入的简化流程演示。" };
-
-  const pairs: Array<[number, number]> = [];
-
-  for (let index = 0; index < array.length; index += 2) {
-    if (index + 1 >= array.length) {
-      pairs.push([array[index], Number.POSITIVE_INFINITY]);
-      continue;
-    }
-
-    yield { type: "compare", indices: [index, index + 1] };
-
-    if (array[index] <= array[index + 1]) {
-      pairs.push([array[index], array[index + 1]]);
-    } else {
-      pairs.push([array[index + 1], array[index]]);
-      [array[index], array[index + 1]] = [array[index + 1], array[index]];
-      yield { type: "swap", indices: [index, index + 1], array: clone(array) };
-    }
-  }
-
-  const mainChain = pairs.map((pair) => pair[1]).filter((value) => Number.isFinite(value));
-  mainChain.sort((left, right) => left - right);
-
-  for (const [small] of pairs) {
-    let insertIndex = 0;
-
-    while (insertIndex < mainChain.length && mainChain[insertIndex] < small) {
-      insertIndex += 1;
-    }
-
-    mainChain.splice(insertIndex, 0, small);
-  }
-
-  for (let index = 0; index < mainChain.length; index += 1) {
-    array[index] = mainChain[index];
-    yield { type: "write", index, value: mainChain[index], array: clone(array) };
-  }
-
-  yield done(array);
-}
-
-function* splaySort(input: number[]): Generator<SortStep> {
-  yield* writeSortedSimulation(input, "伸展树排序会在访问时旋转节点；首版模拟树排序输出，不构造完整旋转动画。");
-}
-
-function* treapSort(input: number[]): Generator<SortStep> {
-  yield* writeSortedSimulation(input, "Treap 排序结合 BST 和随机优先级；首版模拟插入 treap 后中序输出。");
-}
-
 function* patienceMergeSort(input: number[]): Generator<SortStep> {
   const sorted = clone(input).sort((left, right) => left - right);
   yield { type: "message", text: "耐心归并排序先发牌成堆，再用归并堆取最小值。" };
@@ -2197,43 +1782,6 @@ function* patienceMergeSort(input: number[]): Generator<SortStep> {
   }
 
   yield done(sorted);
-}
-
-function* libraryInsertionSort(input: number[]): Generator<SortStep> {
-  yield* librarySort(input);
-}
-
-function* replacementSelectionSort(input: number[]): Generator<SortStep> {
-  yield* writeSortedSimulation(input, "置换选择用于外部排序生成长 run；浏览器内首版只模拟 run 生成后的有序输出。");
-}
-
-function* balancedMergeSort(input: number[]): Generator<SortStep> {
-  yield* writeSortedSimulation(input, "平衡归并排序属于外部排序专题；首版模拟多路归并后的结果。");
-}
-
-function* externalMergeSort(input: number[]): Generator<SortStep> {
-  yield* writeSortedSimulation(input, "外部归并排序依赖磁盘 run 和分批读写；浏览器内只模拟 run 归并结果。");
-}
-
-function* multiwayMergeSort(input: number[]): Generator<SortStep> {
-  const array = clone(input);
-  const sorted = clone(input).sort((left, right) => left - right);
-  yield { type: "message", text: "多路归并排序把多个有序 run 同时归并；首版用三路 run 模拟。" };
-
-  for (let index = 0; index < sorted.length; index += 1) {
-    array[index] = sorted[index];
-    yield { type: "write", index, value: sorted[index], array: clone(array) };
-  }
-
-  yield done(array);
-}
-
-function* polyphaseMergeSort(input: number[]): Generator<SortStep> {
-  yield* writeSortedSimulation(input, "Polyphase 归并排序需要按斐波那契 run 分配多盘介质；首版仅做图鉴模拟。");
-}
-
-function* cascadeMergeSort(input: number[]): Generator<SortStep> {
-  yield* writeSortedSimulation(input, "级联归并排序属于外部排序策略，真实流程依赖多级 run；首版模拟最终归并。");
 }
 
 function* distributionSort(input: number[]): Generator<SortStep> {
@@ -2288,17 +1836,6 @@ function* tagSort(input: number[]): Generator<SortStep> {
 
 function* addressCalculationSort(input: number[]): Generator<SortStep> {
   yield* proxmapSort(input);
-}
-
-function* topologicalSortAsSorting(input: number[]): Generator<SortStep> {
-  const sorted = clone(input).sort((left, right) => left - right);
-  yield { type: "message", text: "拓扑排序不是普通数值排序；这里把 <= 关系当作 DAG 约束做图鉴模拟。" };
-
-  for (let index = 0; index < sorted.length; index += 1) {
-    yield { type: "write", index, value: sorted[index], array: sorted.slice(0, index + 1) };
-  }
-
-  yield done(sorted);
 }
 
 function* bitsetSort(input: number[]): Generator<SortStep> {
@@ -2365,10 +1902,6 @@ function* randomizedQuickSort(input: number[]): Generator<SortStep> {
   yield done(array);
 }
 
-function* blockQuickSort(input: number[]): Generator<SortStep> {
-  yield* writeSortedSimulation(input, "BlockQuicksort 用块缓冲减少分支误判；首版模拟分块 partition 后的结果。");
-}
-
 function* stableQuickSort(input: number[]): Generator<SortStep> {
   const sorted = clone(input)
     .map((value, index) => ({ value, index }))
@@ -2381,40 +1914,6 @@ function* stableQuickSort(input: number[]): Generator<SortStep> {
   }
 
   yield done(sorted);
-}
-
-function* parallelMergeSort(input: number[]): Generator<SortStep> {
-  yield* writeSortedSimulation(input, "并行归并排序会在多线程中拆分任务；浏览器演示只模拟任务完成后的合并。");
-}
-
-function* parallelQuickSort(input: number[]): Generator<SortStep> {
-  yield* writeSortedSimulation(input, "并行快速排序会把左右分区交给不同任务；首版不创建 worker，只模拟结果。");
-}
-
-function* gpuBitonicSort(input: number[], options: SortOptions): Generator<SortStep> {
-  yield { type: "message", text: "GPU 双调排序依赖着色器或计算内核；这里复用受限双调网络演示。" };
-  yield* bitonicSort(input, options);
-}
-
-function* mapreduceSort(input: number[]): Generator<SortStep> {
-  yield* writeSortedSimulation(input, "MapReduce 排序依赖 shuffle、partition 和 reducer；首版只模拟分布式排序结果。");
-}
-
-function* quantumBogoSort(input: number[]): Generator<SortStep> {
-  yield* writeSortedSimulation(input, "量子猴子排序是玩笑概念：把所有排列交给宇宙分支，首版只做图鉴模拟。");
-}
-
-function* bogobogoSort(input: number[], options: SortOptions): Generator<SortStep> {
-  const array = clone(input).slice(0, Math.min(5, options.safety.maxArraySize));
-  yield { type: "message", text: "Bogobogo 排序比猴子排序更危险，真实递归洗牌可能极久；首版强制小规模模拟。" };
-  const sorted = clone(array).sort((left, right) => left - right);
-
-  for (let index = 0; index < sorted.length; index += 1) {
-    array[index] = sorted[index];
-    yield { type: "write", index, value: sorted[index], array: clone(array) };
-  }
-
-  yield done(array);
 }
 
 function* deterministicSeedBogoSort(input: number[], options: SortOptions): Generator<SortStep> {
@@ -2446,19 +1945,6 @@ function* deterministicSeedBogoSort(input: number[], options: SortOptions): Gene
   yield done(array);
 }
 
-function* permutationSort(input: number[], options: SortOptions): Generator<SortStep> {
-  const array = clone(input).slice(0, options.safety.maxArraySize);
-  yield { type: "message", text: "排列排序会枚举排列直到有序，真实运行极慢；这里仅做受限模拟。" };
-  const sorted = clone(array).sort((left, right) => left - right);
-
-  for (let index = 0; index < sorted.length; index += 1) {
-    array[index] = sorted[index];
-    yield { type: "write", index, value: sorted[index], array: clone(array) };
-  }
-
-  yield done(array);
-}
-
 function* randomSort(input: number[], options: SortOptions): Generator<SortStep> {
   let array = clone(input).slice(0, options.safety.maxArraySize);
   yield { type: "message", text: "Random Sort 随机换位直到有序，已限制尝试次数。" };
@@ -2476,136 +1962,6 @@ function* randomSort(input: number[], options: SortOptions): Generator<SortStep>
   }
 
   yield { type: "aborted", reason: "随机换位没有在限制内完成。" };
-}
-
-function* lasVegasSort(input: number[], options: SortOptions): Generator<SortStep> {
-  let array = clone(input).slice(0, options.safety.maxArraySize);
-  yield { type: "message", text: "Las Vegas 排序会随机尝试但必须验证正确性；这里限制尝试次数。" };
-
-  for (let attempt = 0; attempt < 80; attempt += 1) {
-    array = shuffle(array);
-    yield { type: "shuffle", array: clone(array) };
-
-    if (isSorted(array)) {
-      yield done(array);
-      return;
-    }
-  }
-
-  const sorted = clone(array).sort((left, right) => left - right);
-  yield { type: "message", text: "随机尝试未命中，切换到模拟写回。" };
-
-  for (let index = 0; index < sorted.length; index += 1) {
-    array[index] = sorted[index];
-    yield { type: "write", index, value: sorted[index], array: clone(array) };
-  }
-
-  yield done(array);
-}
-
-function* monteCarloSort(input: number[]): Generator<SortStep> {
-  yield* writeSortedSimulation(input, "Monte Carlo 排序允许概率性答案；Sorting Zoo 不输出错误结果，只做概念模拟。");
-}
-
-function* guessSort(input: number[]): Generator<SortStep> {
-  yield* writeSortedSimulation(input, "Guess Sort 靠猜测有序排列；首版直接展示猜中后的结果。");
-}
-
-function* worstSort(input: number[]): Generator<SortStep> {
-  yield* writeSortedSimulation(input, "Worstsort 故意把排序复杂度放大，是危险玩笑算法；这里只做模拟。");
-}
-
-function* bestSort(input: number[]): Generator<SortStep> {
-  const array = clone(input);
-  yield { type: "message", text: "Best Sort 的玩笑设定是假设输入已经最好；若不是，首版模拟修正。" };
-
-  if (isSorted(array)) {
-    yield done(array);
-    return;
-  }
-
-  const sorted = clone(array).sort((left, right) => left - right);
-
-  for (let index = 0; index < sorted.length; index += 1) {
-    array[index] = sorted[index];
-    yield { type: "write", index, value: sorted[index], array: clone(array) };
-  }
-
-  yield done(array);
-}
-
-function* panicSort(input: number[]): Generator<SortStep> {
-  yield { type: "message", text: "Panic Sort 是玩笑算法：发现无序就惊慌。Sorting Zoo 用模拟结果收尾。" };
-  yield* writeSortedSimulation(input, "惊慌之后，还是把数组整理好给用户看。");
-}
-
-function* annealingSort(input: number[]): Generator<SortStep> {
-  const array = clone(input);
-  yield { type: "message", text: "退火排序用随机邻域搜索逼近有序，首版演示少量随机交换后写回。" };
-
-  for (let step = 0; step < Math.min(12, array.length * 2); step += 1) {
-    const left = Math.floor(Math.random() * array.length);
-    const right = Math.floor(Math.random() * array.length);
-    yield { type: "compare", indices: [left, right] };
-
-    if (array[left] > array[right]) {
-      [array[left], array[right]] = [array[right], array[left]];
-      yield { type: "swap", indices: [left, right], array: clone(array) };
-    }
-  }
-
-  const sorted = clone(array).sort((left, right) => left - right);
-
-  for (let index = 0; index < sorted.length; index += 1) {
-    array[index] = sorted[index];
-    yield { type: "write", index, value: sorted[index], array: clone(array) };
-  }
-
-  yield done(array);
-}
-
-function* geneticSort(input: number[]): Generator<SortStep> {
-  yield* writeSortedSimulation(input, "遗传排序会演化排列种群，真实过程开销大且不稳定；首版模拟最优个体。");
-}
-
-function* neuralSort(input: number[]): Generator<SortStep> {
-  yield* writeSortedSimulation(input, "NeuralSort 通常指可微排序近似，不是传统确定排序；首版做概念模拟。");
-}
-
-function* quantumSort(input: number[]): Generator<SortStep> {
-  yield* writeSortedSimulation(input, "量子排序属于理论/概念图鉴条目；网页内不模拟量子态，只展示结果。");
-}
-
-function* entropySort(input: number[]): Generator<SortStep> {
-  yield* writeSortedSimulation(input, "Entropy Sort 按信息熵/不确定性叙事组织比较；首版做图鉴模拟。");
-}
-
-function* timeSort(input: number[], options: SortOptions): Generator<SortStep> {
-  yield { type: "message", text: "Time Sort 类似 Sleep Sort 的时间隐喻；不创建真实计时器风暴，只模拟。" };
-  yield* sleepSort(input, options);
-}
-
-function* calendarSort(input: number[]): Generator<SortStep> {
-  const array = clone(input);
-  const buckets = new Map<number, number[]>();
-  yield { type: "message", text: "Calendar Sort 按时间/日期桶分组；数字数组里用模桶模拟日历格。" };
-
-  for (let index = 0; index < array.length; index += 1) {
-    const key = array[index] % 12;
-    const bucket = buckets.get(key) ?? [];
-    bucket.push(array[index]);
-    buckets.set(key, bucket);
-    yield { type: "mark", indices: [index], role: "candidate" };
-  }
-
-  const sorted = [...buckets.values()].flat().sort((left, right) => left - right);
-
-  for (let index = 0; index < sorted.length; index += 1) {
-    array[index] = sorted[index];
-    yield { type: "write", index, value: sorted[index], array: clone(array) };
-  }
-
-  yield done(array);
 }
 
 function* postOfficeSort(input: number[]): Generator<SortStep> {
@@ -2645,12 +2001,25 @@ function* shortlexSort(input: number[]): Generator<SortStep> {
 function* partialSort(input: number[]): Generator<SortStep> {
   const array = clone(input);
   const count = Math.max(1, Math.floor(array.length / 2));
-  const sortedPrefix = clone(input).sort((left, right) => left - right).slice(0, count);
   yield { type: "message", text: `Partial Sort 只保证前 ${count} 个元素有序，其余元素不承诺全序。` };
 
-  for (let index = 0; index < sortedPrefix.length; index += 1) {
-    array[index] = sortedPrefix[index];
-    yield { type: "write", index, value: sortedPrefix[index], array: clone(array) };
+  for (let start = 0; start < count; start += 1) {
+    let minimum = start;
+
+    for (let index = start + 1; index < array.length; index += 1) {
+      yield { type: "compare", indices: [minimum, index] };
+
+      if (array[index] < array[minimum]) {
+        minimum = index;
+      }
+    }
+
+    if (minimum !== start) {
+      [array[start], array[minimum]] = [array[minimum], array[start]];
+      yield { type: "swap", indices: [start, minimum], array: clone(array) };
+    }
+
+    yield { type: "mark", indices: [start], role: "sorted" };
   }
 
   yield done(array);
@@ -2658,18 +2027,53 @@ function* partialSort(input: number[]): Generator<SortStep> {
 
 function* nthElementSort(input: number[]): Generator<SortStep> {
   const array = clone(input);
-  const sorted = clone(input).sort((left, right) => left - right);
   const nth = Math.floor(array.length / 2);
   yield { type: "message", text: `nth_element 只保证第 ${nth + 1} 小元素归位，两侧满足分区关系。` };
 
-  array[nth] = sorted[nth];
-  yield { type: "write", index: nth, value: sorted[nth], array: clone(array) };
+  function* partition(left: number, right: number): Generator<SortStep, number> {
+    const pivot = array[right];
+    let cursor = left;
+    yield { type: "mark", indices: [right], role: "pivot" };
 
-  for (let index = 0; index < sorted.length; index += 1) {
-    array[index] = sorted[index];
-    yield { type: "write", index, value: sorted[index], array: clone(array) };
+    for (let index = left; index < right; index += 1) {
+      yield { type: "compare", indices: [index, right] };
+
+      if (array[index] <= pivot) {
+        if (cursor !== index) {
+          [array[cursor], array[index]] = [array[index], array[cursor]];
+          yield { type: "swap", indices: [cursor, index], array: clone(array) };
+        }
+
+        cursor += 1;
+      }
+    }
+
+    if (cursor !== right) {
+      [array[cursor], array[right]] = [array[right], array[cursor]];
+      yield { type: "swap", indices: [cursor, right], array: clone(array) };
+    }
+
+    return cursor;
   }
 
+  let left = 0;
+  let right = array.length - 1;
+
+  while (left <= right) {
+    const pivotIndex = yield* partition(left, right);
+
+    if (pivotIndex === nth) {
+      break;
+    }
+
+    if (pivotIndex < nth) {
+      left = pivotIndex + 1;
+    } else {
+      right = pivotIndex - 1;
+    }
+  }
+
+  yield { type: "mark", indices: [nth], role: "sorted" };
   yield done(array);
 }
 
@@ -2710,24 +2114,6 @@ function* stalinSort(input: number[]): Generator<SortStep> {
   }
 
   yield done(array);
-}
-
-function* sleepSort(input: number[], options: SortOptions): Generator<SortStep> {
-  const sorted = clone(input)
-    .slice(0, options.safety.maxArraySize)
-    .sort((left, right) => left - right);
-  const output: number[] = [];
-
-  yield { type: "message", text: "睡眠排序首版使用模拟时间线，不创建真实定时器。" };
-
-  for (let index = 0; index < sorted.length; index += 1) {
-    const value = sorted[index];
-    output.push(value);
-    yield { type: "message", text: `数值 ${value} 醒来，进入输出队列。` };
-    yield { type: "write", index, value, array: clone(output) };
-  }
-
-  yield done(output);
 }
 
 function* exchangeSort(input: number[]): Generator<SortStep> {
@@ -2780,11 +2166,6 @@ function* interpolationSort(input: number[]): Generator<SortStep> {
   yield done(array);
 }
 
-function* histogramSort(input: number[]): Generator<SortStep> {
-  yield { type: "message", text: "直方图排序按值域统计频次；这里复用计数排序式演示。" };
-  yield* countingSort(input);
-}
-
 function* radixExchangeSort(input: number[]): Generator<SortStep> {
   const array = clone(input);
   const maximum = Math.max(...array, 0);
@@ -2832,13 +2213,8 @@ function* radixExchangeSort(input: number[]): Generator<SortStep> {
   yield done(array);
 }
 
-function* simulatedCatalogSort(input: number[], message: string): Generator<SortStep> {
-  yield* writeSortedSimulation(input, message);
-}
-
-export const algorithms: Record<string, SortAlgorithm> = {
-  "bubble-sort": {
-    meta: metaFor("bubble-sort"),
+export const algorithms: Record<string, AlgorithmImplementation> = {
+"bubble-sort": {
     code: `function bubbleSort(array) {
   for (let end = array.length - 1; end > 0; end--) {
     let swapped = false;
@@ -2854,8 +2230,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: bubbleSort,
   },
-  "selection-sort": {
-    meta: metaFor("selection-sort"),
+"selection-sort": {
     code: `function selectionSort(array) {
   for (let start = 0; start < array.length - 1; start++) {
     let min = start;
@@ -2868,8 +2243,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: selectionSort,
   },
-  "insertion-sort": {
-    meta: metaFor("insertion-sort"),
+"insertion-sort": {
     code: `function insertionSort(array) {
   for (let i = 1; i < array.length; i++) {
     const value = array[i];
@@ -2884,8 +2258,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: insertionSort,
   },
-  "merge-sort": {
-    meta: metaFor("merge-sort"),
+"merge-sort": {
     code: `function mergeSort(array) {
   if (array.length <= 1) return array;
   const mid = Math.floor(array.length / 2);
@@ -2893,8 +2266,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: mergeSort,
   },
-  "quick-sort": {
-    meta: metaFor("quick-sort"),
+"quick-sort": {
     code: `function quickSort(array, low = 0, high = array.length - 1) {
   if (low >= high) return array;
   const pivot = partition(array, low, high);
@@ -2904,8 +2276,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: quickSort,
   },
-  "heap-sort": {
-    meta: metaFor("heap-sort"),
+"heap-sort": {
     code: `function heapSort(array) {
   buildMaxHeap(array);
   for (let end = array.length - 1; end > 0; end--) {
@@ -2916,8 +2287,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: heapSort,
   },
-  "counting-sort": {
-    meta: metaFor("counting-sort"),
+"counting-sort": {
     code: `function countingSort(array) {
   const counts = new Array(Math.max(...array) + 1).fill(0);
   for (const value of array) counts[value]++;
@@ -2929,8 +2299,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: countingSort,
   },
-  "radix-sort-lsd": {
-    meta: metaFor("radix-sort-lsd"),
+"radix-sort-lsd": {
     code: `function radixSortLsd(array) {
   for (let place = 1; Math.floor(max(array) / place) > 0; place *= 10) {
     stableBucketByDigit(array, place);
@@ -2939,8 +2308,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: radixSortLsd,
   },
-  "bucket-sort": {
-    meta: metaFor("bucket-sort"),
+"bucket-sort": {
     code: `function bucketSort(array) {
   const buckets = distributeByRange(array);
   for (const bucket of buckets) insertionSort(bucket);
@@ -2948,8 +2316,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: bucketSort,
   },
-  "shell-sort": {
-    meta: metaFor("shell-sort"),
+"shell-sort": {
     code: `function shellSort(array) {
   for (let gap = Math.floor(array.length / 2); gap > 0; gap = Math.floor(gap / 2)) {
     gapInsertionSort(array, gap);
@@ -2958,8 +2325,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: shellSort,
   },
-  "comb-sort": {
-    meta: metaFor("comb-sort"),
+"comb-sort": {
     code: `function combSort(array) {
   let gap = array.length;
   let swapped = true;
@@ -2971,8 +2337,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: combSort,
   },
-  "cocktail-shaker-sort": {
-    meta: metaFor("cocktail-shaker-sort"),
+"cocktail-shaker-sort": {
     code: `function cocktailShakerSort(array) {
   let start = 0;
   let end = array.length - 1;
@@ -2985,8 +2350,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: cocktailShakerSort,
   },
-  "odd-even-sort": {
-    meta: metaFor("odd-even-sort"),
+"odd-even-sort": {
     code: `function oddEvenSort(array) {
   let sorted = false;
   while (!sorted) {
@@ -2996,8 +2360,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: oddEvenSort,
   },
-  "gnome-sort": {
-    meta: metaFor("gnome-sort"),
+"gnome-sort": {
     code: `function gnomeSort(array) {
   let i = 0;
   while (i < array.length) {
@@ -3008,8 +2371,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: gnomeSort,
   },
-  "pancake-sort": {
-    meta: metaFor("pancake-sort"),
+"pancake-sort": {
     code: `function pancakeSort(array) {
   for (let size = array.length; size > 1; size--) {
     flip(array, indexOfMax(array, size));
@@ -3019,8 +2381,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: pancakeSort,
   },
-  "cycle-sort": {
-    meta: metaFor("cycle-sort"),
+"cycle-sort": {
     code: `function cycleSort(array) {
   for (let start = 0; start < array.length - 1; start++) {
     rotateItemToFinalPosition(array, start);
@@ -3029,16 +2390,14 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: cycleSort,
   },
-  "patience-sort": {
-    meta: metaFor("patience-sort"),
+"patience-sort": {
     code: `function patienceSort(array) {
   const piles = dealIntoSortedPiles(array);
   return repeatedlyTakeSmallestPileTop(piles);
 }`,
     generateSteps: patienceSort,
   },
-  "binary-insertion-sort": {
-    meta: metaFor("binary-insertion-sort"),
+"binary-insertion-sort": {
     code: `function binaryInsertionSort(array) {
   for (let i = 1; i < array.length; i++) {
     const pos = binarySearch(array, 0, i, array[i]);
@@ -3048,8 +2407,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: binaryInsertionSort,
   },
-  "bottom-up-merge-sort": {
-    meta: metaFor("bottom-up-merge-sort"),
+"bottom-up-merge-sort": {
     code: `function bottomUpMergeSort(array) {
   for (let width = 1; width < array.length; width *= 2) {
     mergeAdjacentRuns(array, width);
@@ -3058,8 +2416,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: bottomUpMergeSort,
   },
-  "natural-merge-sort": {
-    meta: metaFor("natural-merge-sort"),
+"natural-merge-sort": {
     code: `function naturalMergeSort(array) {
   while (!isSorted(array)) {
     const runs = findIncreasingRuns(array);
@@ -3069,8 +2426,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: naturalMergeSort,
   },
-  "three-way-quick-sort": {
-    meta: metaFor("three-way-quick-sort"),
+"three-way-quick-sort": {
     code: `function threeWayQuickSort(array) {
   partitionIntoLessEqualGreater(array);
   recursivelySortOuterParts(array);
@@ -3078,8 +2434,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: threeWayQuickSort,
   },
-  "dual-pivot-quick-sort": {
-    meta: metaFor("dual-pivot-quick-sort"),
+"dual-pivot-quick-sort": {
     code: `function dualPivotQuickSort(array) {
   chooseTwoPivots(array);
   partitionIntoThreeRegions(array);
@@ -3088,8 +2443,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: dualPivotQuickSort,
   },
-  "intro-sort": {
-    meta: metaFor("intro-sort"),
+"intro-sort": {
     code: `function introSort(array) {
   quickSortUntilDepthLimit(array);
   heapSortWhenRecursionGetsTooDeep(array);
@@ -3098,8 +2452,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: introSort,
   },
-  "tim-sort": {
-    meta: metaFor("tim-sort"),
+"tim-sort": {
     code: `function timSort(array) {
   const runs = detectAndExtendRuns(array);
   mergeRunsByStackInvariant(runs);
@@ -3107,8 +2460,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: timSort,
   },
-  "radix-sort-msd": {
-    meta: metaFor("radix-sort-msd"),
+"radix-sort-msd": {
     code: `function radixSortMsd(array) {
   bucketByMostSignificantDigit(array);
   recursivelyBucketEachDigit(array);
@@ -3116,8 +2468,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: radixSortMsd,
   },
-  "pigeonhole-sort": {
-    meta: metaFor("pigeonhole-sort"),
+"pigeonhole-sort": {
     code: `function pigeonholeSort(array) {
   const holes = countValuesBetweenMinAndMax(array);
   writeBackByHoleOrder(array, holes);
@@ -3125,26 +2476,14 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: pigeonholeSort,
   },
-  "american-flag-sort": {
-    meta: metaFor("american-flag-sort"),
-    code: `function americanFlagSort(array) {
-  for (const digit of digitsFromLeftToRight(array)) {
-    inPlaceBucketCycle(array, digit);
-  }
-  return array;
-}`,
-    generateSteps: americanFlagSort,
-  },
-  "tree-sort": {
-    meta: metaFor("tree-sort"),
+"tree-sort": {
     code: `function treeSort(array) {
   const tree = buildBinarySearchTree(array);
   return inorderTraversal(tree);
 }`,
     generateSteps: treeSort,
   },
-  "tournament-sort": {
-    meta: metaFor("tournament-sort"),
+"tournament-sort": {
     code: `function tournamentSort(array) {
   while (array has active values) {
     output.push(winnerOfTournamentTree(array));
@@ -3153,8 +2492,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: tournamentSort,
   },
-  "strand-sort": {
-    meta: metaFor("strand-sort"),
+"strand-sort": {
     code: `function strandSort(array) {
   while (array.length) {
     output = merge(output, pullIncreasingStrand(array));
@@ -3163,35 +2501,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: strandSort,
   },
-  "library-sort": {
-    meta: metaFor("library-sort"),
-    code: `function librarySort(array) {
-  insertItemsIntoSparseGappedArray(array);
-  rebalanceGapsWhenNeeded(array);
-  return compact(array);
-}`,
-    generateSteps: librarySort,
-  },
-  "bead-sort": {
-    meta: metaFor("bead-sort"),
-    code: `function beadSort(array) {
-  const beads = buildBeadGrid(array);
-  let gravity move beads downward;
-  return readRows(beads);
-}`,
-    generateSteps: beadSort,
-  },
-  "spaghetti-sort": {
-    meta: metaFor("spaghetti-sort"),
-    code: `function spaghettiSort(array) {
-  representValuesAsLengths(array);
-  repeatedlyPullLongestLength();
-  return reversePulledOrder();
-}`,
-    generateSteps: spaghettiSort,
-  },
-  "stooge-sort": {
-    meta: metaFor("stooge-sort"),
+"stooge-sort": {
     code: `function stoogeSort(array, i, j) {
   if (array[i] > array[j]) swap(array, i, j);
   if (j - i + 1 > 2) {
@@ -3204,21 +2514,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: stoogeSort,
   },
-  "slow-sort": {
-    meta: metaFor("slow-sort"),
-    code: `function slowSort(array, i, j) {
-  if (i >= j) return array;
-  const m = Math.floor((i + j) / 2);
-  slowSort(array, i, m);
-  slowSort(array, m + 1, j);
-  if (array[m] > array[j]) swap(array, m, j);
-  slowSort(array, i, j - 1);
-  return array;
-}`,
-    generateSteps: slowSort,
-  },
-  "bozo-sort": {
-    meta: metaFor("bozo-sort"),
+"bozo-sort": {
     code: `function bozoSort(array) {
   while (!isSorted(array)) {
     swapTwoRandomPositions(array);
@@ -3227,18 +2523,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: bozoSort,
   },
-  "miracle-sort": {
-    meta: metaFor("miracle-sort"),
-    code: `function miracleSort(array) {
-  while (!isSorted(array)) {
-    waitForAMiracle();
-  }
-  return array;
-}`,
-    generateSteps: miracleSort,
-  },
-  "in-place-merge-sort": {
-    meta: metaFor("in-place-merge-sort"),
+"in-place-merge-sort": {
     code: `function inPlaceMergeSort(array) {
   splitRecursively(array);
   mergeByShiftingInsideTheSameArray(array);
@@ -3246,17 +2531,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: inPlaceMergeSort,
   },
-  "block-merge-sort": {
-    meta: metaFor("block-merge-sort"),
-    code: `function blockMergeSort(array) {
-  sortSmallBlocks(array);
-  mergeBlocksWithInternalBuffer(array);
-  return array;
-}`,
-    generateSteps: blockMergeSort,
-  },
-  "weave-merge-sort": {
-    meta: metaFor("weave-merge-sort"),
+"weave-merge-sort": {
     code: `function weaveMergeSort(array) {
   const left = sort(valuesAtEvenPositions(array));
   const right = sort(valuesAtOddPositions(array));
@@ -3264,34 +2539,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: weaveMergeSort,
   },
-  "smooth-sort": {
-    meta: metaFor("smooth-sort"),
-    code: `function smoothSort(array) {
-  buildLeonardoHeaps(array);
-  repeatedlyExtractLargest(array);
-  return array;
-}`,
-    generateSteps: smoothSort,
-  },
-  "weak-heap-sort": {
-    meta: metaFor("weak-heap-sort"),
-    code: `function weakHeapSort(array) {
-  buildWeakHeap(array);
-  sortDownWithWeakHeap(array);
-  return array;
-}`,
-    generateSteps: weakHeapSort,
-  },
-  "cartesian-tree-sort": {
-    meta: metaFor("cartesian-tree-sort"),
-    code: `function cartesianTreeSort(array) {
-  const tree = buildCartesianTree(array);
-  return repeatedlyDeleteMinimum(tree);
-}`,
-    generateSteps: cartesianTreeSort,
-  },
-  "flash-sort": {
-    meta: metaFor("flash-sort"),
+"flash-sort": {
     code: `function flashSort(array) {
   classifyByValueRange(array);
   permuteValuesIntoClasses(array);
@@ -3300,8 +2548,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: flashSort,
   },
-  "spread-sort": {
-    meta: metaFor("spread-sort"),
+"spread-sort": {
     code: `function spreadSort(array) {
   spreadValuesIntoIntegerBuckets(array);
   recursivelySortBuckets(array);
@@ -3309,8 +2556,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: spreadSort,
   },
-  "proxmap-sort": {
-    meta: metaFor("proxmap-sort"),
+"proxmap-sort": {
     code: `function proxmapSort(array) {
   mapEachValueToApproximateFinalRegion(array);
   insertionSortEachRegion(array);
@@ -3318,8 +2564,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: proxmapSort,
   },
-  "postman-sort": {
-    meta: metaFor("postman-sort"),
+"postman-sort": {
     code: `function postmanSort(array) {
   for (const digit of addressDigits(array)) {
     deliverValuesIntoDigitBuckets(array, digit);
@@ -3328,17 +2573,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: postmanSort,
   },
-  "burstsort": {
-    meta: metaFor("burstsort"),
-    code: `function burstsort(strings) {
-  insertIntoTrieBuckets(strings);
-  burstLargeBucketsIntoDeeperNodes();
-  return traverseTrieBuckets();
-}`,
-    generateSteps: burstsort,
-  },
-  "sample-sort": {
-    meta: metaFor("sample-sort"),
+"sample-sort": {
     code: `function sampleSort(array) {
   const splitters = chooseSamplePivots(array);
   const buckets = partitionBySplitters(array, splitters);
@@ -3346,8 +2581,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: sampleSort,
   },
-  "bitonic-sort": {
-    meta: metaFor("bitonic-sort"),
+"bitonic-sort": {
     code: `function bitonicSort(array) {
   buildBitonicSequence(array);
   bitonicMerge(array, ascending);
@@ -3355,8 +2589,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: bitonicSort,
   },
-  "odd-even-merge-sort": {
-    meta: metaFor("odd-even-merge-sort"),
+"odd-even-merge-sort": {
     code: `function oddEvenMergeSort(array) {
   recursivelySortHalves(array);
   oddEvenMergeNetwork(array);
@@ -3364,18 +2597,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: oddEvenMergeSort,
   },
-  "pairwise-sorting-network": {
-    meta: metaFor("pairwise-sorting-network"),
-    code: `function pairwiseSortingNetwork(array) {
-  for (const layer of fixedPairwiseLayers(array.length)) {
-    compareExchangeAllPairs(array, layer);
-  }
-  return array;
-}`,
-    generateSteps: pairwiseSortingNetwork,
-  },
-  "rank-sort": {
-    meta: metaFor("rank-sort"),
+"rank-sort": {
     code: `function rankSort(array) {
   for (const value of array) {
     output[countValuesSmallerThan(value)] = value;
@@ -3384,8 +2606,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: rankSort,
   },
-  "brick-sort": {
-    meta: metaFor("brick-sort"),
+"brick-sort": {
     code: `function brickSort(array) {
   while (!sorted) {
     compareOddPairs(array);
@@ -3395,8 +2616,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: brickSort,
   },
-  "circle-sort": {
-    meta: metaFor("circle-sort"),
+"circle-sort": {
     code: `function circleSort(array) {
   do {
     changed = compareOuterPairsThenRecurse(array);
@@ -3405,28 +2625,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: circleSort,
   },
-  "cycle-leader-sort": {
-    meta: metaFor("cycle-leader-sort"),
-    code: `function cycleLeaderSort(array) {
-  const permutation = finalSortedPermutation(array);
-  rotateEachPermutationCycle(array, permutation);
-  return array;
-}`,
-    generateSteps: cycleLeaderSort,
-  },
-  "drop-merge-sort": {
-    meta: metaFor("drop-merge-sort"),
-    code: `function dropMergeSort(array) {
-  for (const value of array) {
-    if (keepsMergeOrder(value)) output.push(value);
-    else drop(value);
-  }
-  return output;
-}`,
-    generateSteps: dropMergeSort,
-  },
-  "quickselect-sort": {
-    meta: metaFor("quickselect-sort"),
+"quickselect-sort": {
     code: `function quickselectSort(array) {
   for (let k = 0; k < array.length; k++) {
     output[k] = quickselect(array, k);
@@ -3435,8 +2634,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: quickselectSort,
   },
-  "median-of-three-quick-sort": {
-    meta: metaFor("median-of-three-quick-sort"),
+"median-of-three-quick-sort": {
     code: `function medianOfThreeQuickSort(array) {
   const pivot = medianOf(first, middle, last);
   partitionAroundPivot(array, pivot);
@@ -3445,8 +2643,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: medianOfThreeQuickSort,
   },
-  "ternary-heap-sort": {
-    meta: metaFor("ternary-heap-sort"),
+"ternary-heap-sort": {
     code: `function ternaryHeapSort(array) {
   buildThreeAryMaxHeap(array);
   repeatedlyMoveRootToEnd(array);
@@ -3454,186 +2651,14 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: ternaryHeapSort,
   },
-  "binomial-heap-sort": {
-    meta: metaFor("binomial-heap-sort"),
-    code: `function binomialHeapSort(array) {
-  const heap = buildBinomialHeap(array);
-  return repeatedlyExtractMin(heap);
-}`,
-    generateSteps: binomialHeapSort,
-  },
-  "pairing-heap-sort": {
-    meta: metaFor("pairing-heap-sort"),
-    code: `function pairingHeapSort(array) {
-  const heap = buildPairingHeap(array);
-  return repeatedlyExtractMin(heap);
-}`,
-    generateSteps: pairingHeapSort,
-  },
-  "cube-sort": {
-    meta: metaFor("cube-sort"),
-    code: `function cubeSort(array) {
-  detectRuns(array);
-  mergeRunsWithCubesortStrategy(array);
-  return array;
-}`,
-    generateSteps: cubeSort,
-  },
-  "quad-sort": {
-    meta: metaFor("quad-sort"),
-    code: `function quadSort(array) {
-  sortSmallQuads(array);
-  parityMergeBlocks(array);
-  return array;
-}`,
-    generateSteps: quadSort,
-  },
-  "grail-sort": {
-    meta: metaFor("grail-sort"),
-    code: `function grailSort(array) {
-  chooseInternalBuffer(array);
-  stableBlockMergeInPlace(array);
-  return array;
-}`,
-    generateSteps: grailSort,
-  },
-  "wiki-sort": {
-    meta: metaFor("wiki-sort"),
-    code: `function wikiSort(array) {
-  findKeysAndBuffer(array);
-  stableBlockMerge(array);
-  return array;
-}`,
-    generateSteps: wikiSort,
-  },
-  "flux-sort": {
-    meta: metaFor("flux-sort"),
-    code: `function fluxSort(array) {
-  analyzeDistribution(array);
-  choosePartitionOrMergeStrategy(array);
-  return array;
-}`,
-    generateSteps: fluxSort,
-  },
-  "pdq-sort": {
-    meta: metaFor("pdq-sort"),
-    code: `function pdqSort(array) {
-  quicksortWithPatternDetection(array);
-  breakBadPatternsOrFallback(array);
-  return array;
-}`,
-    generateSteps: pdqSort,
-  },
-  "power-sort": {
-    meta: metaFor("power-sort"),
-    code: `function powerSort(array) {
-  detectRuns(array);
-  mergeByNodePowerInvariant(array);
-  return array;
-}`,
-    generateSteps: powerSort,
-  },
-  "shivers-sort": {
-    meta: metaFor("shivers-sort"),
-    code: `function shiversSort(array) {
-  detectRuns(array);
-  mergeRunsByShiversStackRule(array);
-  return array;
-}`,
-    generateSteps: shiversSort,
-  },
-  "merge-insertion-sort": {
-    meta: metaFor("merge-insertion-sort"),
-    code: `function mergeInsertionSort(array) {
-  pairItemsAndSortLargerValues(array);
-  insertSmallerValuesByJacobsthalOrder(array);
-  return array;
-}`,
-    generateSteps: mergeInsertionSort,
-  },
-  "splay-sort": {
-    meta: metaFor("splay-sort"),
-    code: `function splaySort(array) {
-  const tree = buildSplayTree(array);
-  return inorderTraversal(tree);
-}`,
-    generateSteps: splaySort,
-  },
-  "treap-sort": {
-    meta: metaFor("treap-sort"),
-    code: `function treapSort(array) {
-  const treap = insertByKeyAndPriority(array);
-  return inorderTraversal(treap);
-}`,
-    generateSteps: treapSort,
-  },
-  "patience-merge-sort": {
-    meta: metaFor("patience-merge-sort"),
+"patience-merge-sort": {
     code: `function patienceMergeSort(array) {
   const piles = dealIntoPatiencePiles(array);
   return mergePileTopsWithPriorityQueue(piles);
 }`,
     generateSteps: patienceMergeSort,
   },
-  "library-insertion-sort": {
-    meta: metaFor("library-insertion-sort"),
-    code: `function libraryInsertionSort(array) {
-  insertIntoGappedShelf(array);
-  rebalanceShelfWhenCrowded(array);
-  return compactShelf(array);
-}`,
-    generateSteps: libraryInsertionSort,
-  },
-  "replacement-selection-sort": {
-    meta: metaFor("replacement-selection-sort"),
-    code: `function replacementSelectionSort(stream) {
-  const runs = generateRunsWithPriorityQueue(stream);
-  return multiwayMerge(runs);
-}`,
-    generateSteps: replacementSelectionSort,
-  },
-  "balanced-merge-sort": {
-    meta: metaFor("balanced-merge-sort"),
-    code: `function balancedMergeSort(runs) {
-  distributeRunsAcrossTapes(runs);
-  return balancedMultiwayMerge(runs);
-}`,
-    generateSteps: balancedMergeSort,
-  },
-  "external-merge-sort": {
-    meta: metaFor("external-merge-sort"),
-    code: `function externalMergeSort(files) {
-  const runs = createSortedRuns(files);
-  return mergeRunsFromDisk(runs);
-}`,
-    generateSteps: externalMergeSort,
-  },
-  "multiway-merge-sort": {
-    meta: metaFor("multiway-merge-sort"),
-    code: `function multiwayMergeSort(runs) {
-  const heap = initializeRunHeap(runs);
-  return repeatedlyTakeSmallest(heap);
-}`,
-    generateSteps: multiwayMergeSort,
-  },
-  "polyphase-merge-sort": {
-    meta: metaFor("polyphase-merge-sort"),
-    code: `function polyphaseMergeSort(runs) {
-  distributeRunsByFibonacciCounts(runs);
-  return mergeAcrossTapePhases(runs);
-}`,
-    generateSteps: polyphaseMergeSort,
-  },
-  "cascade-merge-sort": {
-    meta: metaFor("cascade-merge-sort"),
-    code: `function cascadeMergeSort(runs) {
-  cascadeRunsThroughMergeLevels(runs);
-  return finalMergedRun(runs);
-}`,
-    generateSteps: cascadeMergeSort,
-  },
-  "distribution-sort": {
-    meta: metaFor("distribution-sort"),
+"distribution-sort": {
     code: `function distributionSort(array) {
   const buckets = distributeByKeyRange(array);
   sortEachBucket(buckets);
@@ -3641,8 +2666,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: distributionSort,
   },
-  "integer-sort": {
-    meta: metaFor("integer-sort"),
+"integer-sort": {
     code: `function integerSort(array) {
   countOrBucketIntegerKeys(array);
   writeBackInIntegerOrder(array);
@@ -3650,8 +2674,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: integerSort,
   },
-  "tag-sort": {
-    meta: metaFor("tag-sort"),
+"tag-sort": {
     code: `function tagSort(records) {
   const tags = records.map((record, index) => ({ key: record.key, index }));
   sortTags(tags);
@@ -3659,8 +2682,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: tagSort,
   },
-  "address-calculation-sort": {
-    meta: metaFor("address-calculation-sort"),
+"address-calculation-sort": {
     code: `function addressCalculationSort(array) {
   mapValuesToApproximateAddresses(array);
   insertIntoAddressBuckets(array);
@@ -3668,23 +2690,14 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: addressCalculationSort,
   },
-  "topological-sort-as-sorting": {
-    meta: metaFor("topological-sort-as-sorting"),
-    code: `function topologicalSortAsSorting(items, edges) {
-  return topologicalOrderOfDependencyGraph(items, edges);
-}`,
-    generateSteps: topologicalSortAsSorting,
-  },
-  "bitset-sort": {
-    meta: metaFor("bitset-sort"),
+"bitset-sort": {
     code: `function bitsetSort(array) {
   markSeenValuesInBitset(array);
   return readSetBitsInOrder();
 }`,
     generateSteps: bitsetSort,
   },
-  "randomized-quick-sort": {
-    meta: metaFor("randomized-quick-sort"),
+"randomized-quick-sort": {
     code: `function randomizedQuickSort(array) {
   const pivot = chooseRandomPivot(array);
   partitionAndRecurse(array, pivot);
@@ -3692,77 +2705,14 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: randomizedQuickSort,
   },
-  "block-quick-sort": {
-    meta: metaFor("block-quick-sort"),
-    code: `function blockQuickSort(array) {
-  partitionUsingBlockBuffers(array);
-  recurseOrFallback(array);
-  return array;
-}`,
-    generateSteps: blockQuickSort,
-  },
-  "stable-quick-sort": {
-    meta: metaFor("stable-quick-sort"),
+"stable-quick-sort": {
     code: `function stableQuickSort(array) {
   const lessEqualGreater = stablePartition(array);
   return concatenateSortedPartitions(lessEqualGreater);
 }`,
     generateSteps: stableQuickSort,
   },
-  "parallel-merge-sort": {
-    meta: metaFor("parallel-merge-sort"),
-    code: `function parallelMergeSort(array) {
-  spawnSortTasksForHalves(array);
-  parallelMergeResults(array);
-  return array;
-}`,
-    generateSteps: parallelMergeSort,
-  },
-  "parallel-quick-sort": {
-    meta: metaFor("parallel-quick-sort"),
-    code: `function parallelQuickSort(array) {
-  partition(array);
-  sortPartitionsInParallel(array);
-  return array;
-}`,
-    generateSteps: parallelQuickSort,
-  },
-  "gpu-bitonic-sort": {
-    meta: metaFor("gpu-bitonic-sort"),
-    code: `function gpuBitonicSort(buffer) {
-  dispatchBitonicCompareExchangeKernels(buffer);
-  return readBackSortedBuffer(buffer);
-}`,
-    generateSteps: gpuBitonicSort,
-  },
-  "mapreduce-sort": {
-    meta: metaFor("mapreduce-sort"),
-    code: `function mapreduceSort(records) {
-  mapToPartitionedKeyValuePairs(records);
-  shuffleByKeyRange(records);
-  return reduceSortedPartitions(records);
-}`,
-    generateSteps: mapreduceSort,
-  },
-  "quantum-bogo-sort": {
-    meta: metaFor("quantum-bogo-sort"),
-    code: `function quantumBogoSort(array) {
-  splitUniverseIntoEveryPermutation(array);
-  return observeUniverseWhereArrayIsSorted();
-}`,
-    generateSteps: quantumBogoSort,
-  },
-  "bogobogo-sort": {
-    meta: metaFor("bogobogo-sort"),
-    code: `function bogobogoSort(array) {
-  recursivelyBogosortPrefixes(array);
-  shuffleEverythingWhenPrefixFails(array);
-  return array;
-}`,
-    generateSteps: bogobogoSort,
-  },
-  "bogosort-deterministic-seed": {
-    meta: metaFor("bogosort-deterministic-seed"),
+"bogosort-deterministic-seed": {
     code: `function deterministicSeedBogoSort(array, seed) {
   while (!isSorted(array)) {
     shuffleWithSeed(array, seed);
@@ -3771,17 +2721,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: deterministicSeedBogoSort,
   },
-  "permutation-sort": {
-    meta: metaFor("permutation-sort"),
-    code: `function permutationSort(array) {
-  for (const permutation of everyPermutation(array)) {
-    if (isSorted(permutation)) return permutation;
-  }
-}`,
-    generateSteps: permutationSort,
-  },
-  "random-sort": {
-    meta: metaFor("random-sort"),
+"random-sort": {
     code: `function randomSort(array) {
   while (!isSorted(array)) {
     swapTwoRandomItems(array);
@@ -3790,120 +2730,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: randomSort,
   },
-  "las-vegas-sort": {
-    meta: metaFor("las-vegas-sort"),
-    code: `function lasVegasSort(array) {
-  do {
-    shuffle(array);
-  } while (!verifySorted(array));
-  return array;
-}`,
-    generateSteps: lasVegasSort,
-  },
-  "monte-carlo-sort": {
-    meta: metaFor("monte-carlo-sort"),
-    code: `function monteCarloSort(array) {
-  const candidate = probabilisticSortAttempt(array);
-  return candidateLikelySorted(candidate) ? candidate : retryOrReportUncertainty();
-}`,
-    generateSteps: monteCarloSort,
-  },
-  "guess-sort": {
-    meta: metaFor("guess-sort"),
-    code: `function guessSort(array) {
-  const guess = guessSortedPermutation(array);
-  return verify(guess) ? guess : tryAgain();
-}`,
-    generateSteps: guessSort,
-  },
-  "worstsort": {
-    meta: metaFor("worstsort"),
-    code: `function worstsort(array) {
-  intentionallyMakeSortingAsBadAsPossible(array);
-  return eventuallySort(array);
-}`,
-    generateSteps: worstSort,
-  },
-  "best-sort": {
-    meta: metaFor("best-sort"),
-    code: `function bestSort(array) {
-  if (isAlreadyBest(array)) return array;
-  return explainWhyInputShouldHaveBeenSorted();
-}`,
-    generateSteps: bestSort,
-  },
-  "panic-sort": {
-    meta: metaFor("panic-sort"),
-    code: `function panicSort(array) {
-  if (!isSorted(array)) panic();
-  return recoverAndSort(array);
-}`,
-    generateSteps: panicSort,
-  },
-  "annealing-sort": {
-    meta: metaFor("annealing-sort"),
-    code: `function annealingSort(array) {
-  while (temperature > 0) {
-    maybeAcceptRandomSwap(array, temperature);
-    coolDown();
-  }
-  return array;
-}`,
-    generateSteps: annealingSort,
-  },
-  "genetic-sort": {
-    meta: metaFor("genetic-sort"),
-    code: `function geneticSort(array) {
-  let population = randomPermutations(array);
-  evolveUntilSorted(population);
-  return bestIndividual(population);
-}`,
-    generateSteps: geneticSort,
-  },
-  "neural-sort": {
-    meta: metaFor("neural-sort"),
-    code: `function neuralSort(array) {
-  const softPermutation = differentiableSortingNetwork(array);
-  return discretize(softPermutation);
-}`,
-    generateSteps: neuralSort,
-  },
-  "quantum-sort": {
-    meta: metaFor("quantum-sort"),
-    code: `function quantumSort(array) {
-  prepareQuantumState(array);
-  observeSortedOutcome();
-  return sortedClassicalResult(array);
-}`,
-    generateSteps: quantumSort,
-  },
-  "entropy-sort": {
-    meta: metaFor("entropy-sort"),
-    code: `function entropySort(array) {
-  chooseComparisonsThatReduceUncertainty(array);
-  return sorted(array);
-}`,
-    generateSteps: entropySort,
-  },
-  "time-sort": {
-    meta: metaFor("time-sort"),
-    code: `function timeSort(array) {
-  scheduleEachValueByTime(array);
-  return collectInTimerOrder();
-}`,
-    generateSteps: timeSort,
-  },
-  "calendar-sort": {
-    meta: metaFor("calendar-sort"),
-    code: `function calendarSort(array) {
-  bucketByCalendarSlot(array);
-  sortInsideSlots(array);
-  return flattenCalendar(array);
-}`,
-    generateSteps: calendarSort,
-  },
-  "post-office-sort": {
-    meta: metaFor("post-office-sort"),
+"post-office-sort": {
     code: `function postOfficeSort(array) {
   routeItemsByAddressDigits(array);
   collectRoutesInAddressOrder(array);
@@ -3911,30 +2738,26 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: postOfficeSort,
   },
-  "lexicographic-sort": {
-    meta: metaFor("lexicographic-sort"),
+"lexicographic-sort": {
     code: `function lexicographicSort(array) {
   return array.sort((a, b) => String(a).localeCompare(String(b)));
 }`,
     generateSteps: lexicographicSort,
   },
-  "shortlex-sort": {
-    meta: metaFor("shortlex-sort"),
+"shortlex-sort": {
     code: `function shortlexSort(array) {
   return array.sort(byLengthThenLexicographicOrder);
 }`,
     generateSteps: shortlexSort,
   },
-  "partial-sort": {
-    meta: metaFor("partial-sort"),
+"partial-sort": {
     code: `function partialSort(array, count) {
   sortOnlyTheSmallestPrefix(array, count);
   return array;
 }`,
     generateSteps: partialSort,
   },
-  "nth-element-sort": {
-    meta: metaFor("nth-element-sort"),
+"nth-element-sort": {
     code: `function nthElementSort(array, n) {
   quickselectNthIntoPlace(array, n);
   partitionAroundNth(array, n);
@@ -3942,79 +2765,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: nthElementSort,
   },
-  "aks-sorting-network": {
-    meta: metaFor("aks-sorting-network"),
-    code: `function aksSortingNetwork(array) {
-  const network = theoreticalAksNetwork(array.length);
-  return applyComparatorNetwork(array, network);
-}
-// Sorting Zoo 只做图鉴模拟，不展开巨大理论网络。`,
-    generateSteps: (input) => simulatedCatalogSort(input, "AKS 排序网络常数极大，首版不真实展开比较网络，只展示理论条目结果。"),
-  },
-  "alpha-merge-sort": {
-    meta: metaFor("alpha-merge-sort"),
-    code: `function alphaMergeSort(array) {
-  const runs = detectNaturalRuns(array);
-  return mergeRunsByAlphaPolicy(runs);
-}`,
-    generateSteps: (input) => simulatedCatalogSort(input, "Alpha Merge Sort 属于自适应归并策略，首版以图鉴模拟方式展示。"),
-  },
-  "alpha-stack-sort": {
-    meta: metaFor("alpha-stack-sort"),
-    code: `function alphaStackSort(array) {
-  const stack = pushNaturalRuns(array);
-  enforceAlphaStackInvariant(stack);
-  return collapseRuns(stack);
-}`,
-    generateSteps: (input) => simulatedCatalogSort(input, "Alpha Stack Sort 依赖 run 栈不变量，首版保留为自适应归并图鉴。"),
-  },
-  "binar-sort": {
-    meta: metaFor("binar-sort"),
-    code: `function binarSort(array) {
-  classifyByBinarRule(array);
-  return collectClassifiedValues(array);
-}
-// 冷门资料条目，首版只做概念展示。`,
-    generateSteps: (input) => simulatedCatalogSort(input, "Binar Sort 公开资料分散，首版只做目录级模拟。"),
-  },
-  "burnt-pancake-sort": {
-    meta: metaFor("burnt-pancake-sort"),
-    code: `function burntPancakeSort(stack) {
-  while (!isSortedAndRightSideUp(stack)) {
-    flipPrefixAndToggleSides(stack);
-  }
-  return stack;
-}`,
-    generateSteps: (input) => simulatedCatalogSort(input, "烤焦煎饼排序需要表示正反面；数字数组中只模拟翻面排序结果。"),
-  },
-  "cache-conscious-burstsort": {
-    meta: metaFor("cache-conscious-burstsort"),
-    code: `function cacheConsciousBurstsort(strings) {
-  insertIntoCacheFriendlyBurstTrie(strings);
-  burstOversizedBuckets();
-  return traverseBuckets();
-}`,
-    generateSteps: (input) => simulatedCatalogSort(input, "缓存感知 Burstsort 面向字符串和缓存局部性，首版不真实构建 trie。"),
-  },
-  "columnsort": {
-    meta: metaFor("columnsort"),
-    code: `function columnsort(matrix) {
-  repeatColumnAndRowSortPhases(matrix);
-  return flatten(matrix);
-}`,
-    generateSteps: (input) => simulatedCatalogSort(input, "Columnsort 依赖矩阵形状和并行轮次，首版作为图鉴模拟。"),
-  },
-  "crum-sort": {
-    meta: metaFor("crum-sort"),
-    code: `function crumsort(array) {
-  partitionWithEngineeringGuards(array);
-  finishSmallPartitions(array);
-  return array;
-}`,
-    generateSteps: (input) => simulatedCatalogSort(input, "Crumsort 是工程型快速排序变体，首版保留概念展示。"),
-  },
-  "exchange-sort": {
-    meta: metaFor("exchange-sort"),
+"exchange-sort": {
     code: `function exchangeSort(array) {
   for (let i = 0; i < array.length - 1; i++) {
     for (let j = i + 1; j < array.length; j++) {
@@ -4025,42 +2776,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: exchangeSort,
   },
-  "funnel-sort": {
-    meta: metaFor("funnel-sort"),
-    code: `function funnelsort(array) {
-  const funnels = buildCacheObliviousFunnels(array);
-  return mergeThroughFunnels(funnels);
-}`,
-    generateSteps: (input) => simulatedCatalogSort(input, "Funnelsort 的缓存无关漏斗结构复杂，首版只做图鉴模拟。"),
-  },
-  "hash-sort": {
-    meta: metaFor("hash-sort"),
-    code: `function hashSort(array) {
-  const buckets = hashValuesIntoBuckets(array);
-  resolveCollisionsInsideBuckets(buckets);
-  return concatenateBuckets(buckets);
-}`,
-    generateSteps: (input) => simulatedCatalogSort(input, "Hash Sort 依赖哈希分布和冲突处理，首版用安全模拟收尾。"),
-  },
-  "histogram-sort": {
-    meta: metaFor("histogram-sort"),
-    code: `function histogramSort(array) {
-  const histogram = countFrequencies(array);
-  return expandHistogram(histogram);
-}`,
-    generateSteps: histogramSort,
-  },
-  "intelligent-design-sort": {
-    meta: metaFor("intelligent-design-sort"),
-    code: `function intelligentDesignSort(array) {
-  assumeInputWasDesignedSorted(array);
-  return array;
-}
-// 玩笑算法：不适合真实排序。`,
-    generateSteps: (input) => simulatedCatalogSort(input, "智能设计排序声称输入本来就有序；Sorting Zoo 只做玩笑图鉴模拟。"),
-  },
-  "interpolation-sort": {
-    meta: metaFor("interpolation-sort"),
+"interpolation-sort": {
     code: `function interpolationSort(array) {
   const buckets = placeByInterpolatedPosition(array);
   insertionSortEachBucket(buckets);
@@ -4068,67 +2784,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: interpolationSort,
   },
-  "msd-string-radix-sort": {
-    meta: metaFor("msd-string-radix-sort"),
-    code: `function msdStringRadixSort(strings, depth = 0) {
-  const buckets = bucketByCharacter(strings, depth);
-  return recursivelyCollectBuckets(buckets, depth + 1);
-}`,
-    generateSteps: (input) => simulatedCatalogSort(input, "MSD 字符串基数排序面向字符串键，数字数组中只保留图鉴模拟。"),
-  },
-  "multikey-quick-sort": {
-    meta: metaFor("multikey-quick-sort"),
-    code: `function multikeyQuickSort(strings, depth = 0) {
-  partitionByCharacter(strings, depth);
-  recurseLessEqualGreaterParts(strings, depth);
-  return strings;
-}`,
-    generateSteps: (input) => simulatedCatalogSort(input, "Multikey Quicksort 是字符串三路快排，首版不把数字强行转成完整字符串专题。"),
-  },
-  "peek-sort": {
-    meta: metaFor("peek-sort"),
-    code: `function peeksort(array) {
-  const runs = peekExistingRuns(array);
-  return adaptiveMerge(runs);
-}`,
-    generateSteps: (input) => simulatedCatalogSort(input, "Peeksort 会探测已有 run 再自适应归并，首版做概念模拟。"),
-  },
-  "poplar-sort": {
-    meta: metaFor("poplar-sort"),
-    code: `function poplarSort(array) {
-  const poplars = buildPoplarHeapForest(array);
-  return drainPoplars(poplars);
-}`,
-    generateSteps: (input) => simulatedCatalogSort(input, "Poplar Sort 使用 poplar 堆结构，首版不展开冷门堆细节。"),
-  },
-  "quick-heap-sort": {
-    meta: metaFor("quick-heap-sort"),
-    code: `function quickHeapsort(array) {
-  quickPartition(array);
-  heapSelectRemainingPart(array);
-  return array;
-}`,
-    generateSteps: (input) => simulatedCatalogSort(input, "QuickHeapsort 是快排与堆选择混合研究条目，首版模拟展示。"),
-  },
-  "quick-merge-sort": {
-    meta: metaFor("quick-merge-sort"),
-    code: `function quickMergesort(array) {
-  splitWithQuickPartition(array);
-  mergeSortedRuns(array);
-  return array;
-}`,
-    generateSteps: (input) => simulatedCatalogSort(input, "QuickMergesort 混合快速排序和归并策略，首版保留图鉴模拟。"),
-  },
-  "quick-weak-heap-sort": {
-    meta: metaFor("quick-weak-heap-sort"),
-    code: `function quickWeakHeapsort(array) {
-  partitionThenWeakHeapSelect(array);
-  return array;
-}`,
-    generateSteps: (input) => simulatedCatalogSort(input, "QuickWeakHeapsort 使用弱堆变体，首版只做安全模拟。"),
-  },
-  "radix-exchange-sort": {
-    meta: metaFor("radix-exchange-sort"),
+"radix-exchange-sort": {
     code: `function radixExchangeSort(array, bit) {
   partitionByCurrentBit(array, bit);
   radixExchangeSort(leftPart, bit >> 1);
@@ -4137,60 +2793,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 }`,
     generateSteps: radixExchangeSort,
   },
-  "random-comparator-sort": {
-    meta: metaFor("random-comparator-sort"),
-    code: `function randomComparatorSort(array) {
-  return array.sort(() => Math.random() - 0.5);
-}
-// 比较器不自洽，真实运行结果不可依赖。`,
-    generateSteps: (input) => simulatedCatalogSort(input, "随机比较器违反排序比较契约，真实结果不可预测；这里只模拟安全结果。"),
-  },
-  "shearsort": {
-    meta: metaFor("shearsort"),
-    code: `function shearsort(matrix) {
-  repeatSnakeRowSortsAndColumnSorts(matrix);
-  return flatten(matrix);
-}`,
-    generateSteps: (input) => simulatedCatalogSort(input, "Shearsort 需要二维网格并行模型，首版只做图鉴模拟。"),
-  },
-  "shellsort-network": {
-    meta: metaFor("shellsort-network"),
-    code: `function shellsortNetwork(array) {
-  for (const comparator of fixedShellComparators(array.length)) {
-    compareExchange(array, comparator);
-  }
-  return array;
-}`,
-    generateSteps: (input) => simulatedCatalogSort(input, "Shellsort Network 要固定规模比较网络，首版不真实展开所有比较器。"),
-  },
-  "square-sort": {
-    meta: metaFor("square-sort"),
-    code: `function squareSort(array) {
-  arrangeSquareRuns(array);
-  mergeSquareRuns(array);
-  return array;
-}`,
-    generateSteps: (input) => simulatedCatalogSort(input, "SquareSort 是较新的研究型条目，首版保留为图鉴模拟。"),
-  },
-  "twin-array-sort": {
-    meta: metaFor("twin-array-sort"),
-    code: `function twinArraySort(array) {
-  const auxiliary = buildTwinArray(array);
-  coordinateWrites(array, auxiliary);
-  return array;
-}`,
-    generateSteps: (input) => simulatedCatalogSort(input, "Twin Array Sort 资料较冷门，首版只做目录级模拟。"),
-  },
-  "zig-zag-sort": {
-    meta: metaFor("zig-zag-sort"),
-    code: `function zigZagSort(array) {
-  applyZigZagComparatorPattern(array);
-  return array;
-}`,
-    generateSteps: (input) => simulatedCatalogSort(input, "Zig-zag Sort 属冷门网络/并行资料条目，首版图鉴模拟。"),
-  },
-  "bogo-sort": {
-    meta: metaFor("bogo-sort"),
+"bogo-sort": {
     code: `function bogoSort(array) {
   while (!isSorted(array)) {
     shuffle(array);
@@ -4200,8 +2803,7 @@ export const algorithms: Record<string, SortAlgorithm> = {
 // Sorting Zoo 会限制数组规模、步骤数和运行时间。`,
     generateSteps: bogoSort,
   },
-  "stalin-sort": {
-    meta: metaFor("stalin-sort"),
+"stalin-sort": {
     code: `function stalinSort(array) {
   const output = [array[0]];
   for (const value of array.slice(1)) {
@@ -4210,15 +2812,5 @@ export const algorithms: Record<string, SortAlgorithm> = {
   return output;
 }`,
     generateSteps: stalinSort,
-  },
-  "sleep-sort": {
-    meta: metaFor("sleep-sort"),
-    code: `function sleepSort(array, emit) {
-  for (const value of array) {
-    setTimeout(() => emit(value), value);
   }
-}
-// Sorting Zoo 首版只做模拟演示，不启动真实定时器排序。`,
-    generateSteps: sleepSort,
-  },
 };

@@ -6,6 +6,8 @@ export type AlgorithmCategory =
   | "整活排序"
   | "危险排序";
 
+export type AlgorithmImplementationLevel = "full" | "simplified" | "simulated" | "catalog-only";
+
 export type SortStep =
   | { type: "compare"; indices: number[] }
   | { type: "swap"; indices: [number, number]; array: number[] }
@@ -32,6 +34,7 @@ export interface AlgorithmMeta {
   inPlace: boolean | "depends";
   canRunForever: boolean;
   runMode: "real" | "limited" | "simulated" | "catalog-only";
+  implementationLevel: AlgorithmImplementationLevel;
   source: "built-in" | "ai-generated" | "user-draft";
   timeComplexity: {
     best: string;
@@ -63,6 +66,8 @@ export interface SortAlgorithm {
   code: string;
   generateSteps: (input: number[], options: SortOptions) => Generator<SortStep>;
 }
+
+export type AlgorithmImplementation = Omit<SortAlgorithm, "meta">;
 
 export interface VisualStats {
   steps: number;

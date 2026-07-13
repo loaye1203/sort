@@ -28,6 +28,30 @@
   gap: 12px;
 }
 
+.libraryClose {
+  display: none;
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: #aeb7c7;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.libraryBackdrop {
+  display: none;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .brandMark {
   display: grid;
   place-items: center;
@@ -415,8 +439,8 @@
   border-radius: 4px 4px 2px 2px;
   background: #94a3b8;
   transition:
-    height 120ms ease,
-    background 120ms ease;
+    height var(--bar-transition-ms, 120ms) ease,
+    background var(--bar-transition-ms, 120ms) ease;
 }
 
 .baractive {
@@ -774,7 +798,7 @@
   .sidebar {
     position: fixed;
     inset: 62px 0 0;
-    z-index: 4;
+    z-index: 7;
     display: none;
     height: auto;
     max-height: none;
@@ -784,6 +808,19 @@
 
   .sidebarOpen {
     display: flex;
+  }
+
+  .libraryBackdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 6;
+    display: block;
+    border: 0;
+    background: transparent;
+  }
+
+  .libraryClose {
+    display: block;
   }
 
   .stage {
@@ -802,6 +839,20 @@
 
   .shell[data-theme="light"] .sidebar {
     border-bottom-color: #d9e1ea;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell {
+    scroll-behavior: auto;
+  }
+
+  .bars {
+    --bar-transition-ms: 0ms;
+  }
+
+  .bar {
+    transition-duration: 0ms;
   }
 }
 
